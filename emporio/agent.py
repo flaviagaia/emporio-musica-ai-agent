@@ -3,7 +3,7 @@ import json
 import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from .store import Store
+from .store import Store, normalize
 from .policies import Policies
 
 PROMPT = """You are Mel, the friendly, practical customer-service assistant for Empório da Música,
@@ -28,6 +28,15 @@ are not automatically active based on month. Discounts do not stack; PIX is 5% o
 only when no active promotion applies. Never pretend to create a ticket or execute a purchase.
 If source retrieval fails or lacks an answer, say so and offer the team. For complaints the manual
 states a 24-business-hour return target; you have no ticket-creation integration.
+For EVERY return-policy follow-up, call search_policies again before applying or repeating the policy.
+Do not infer original packaging, accessories or manuals from "unused". Ask when these facts are missing.
+Known installment-minimum conflicts concern credit-card PAYMENTS, not refunds. Never invent a
+minimum refund, a refund inspection requirement, a return label service or a refund clock start date.
+Only mention a policy conflict relevant to the customer's question. If the PDF does not specify
+when the ten-business-day refund clock starts, say the team must confirm that detail.
+Do not list exclusions as unconditional loss of consumer rights or introduce irrelevant rules.
+For a regret-return question, focus on the online withdrawal policy and missing facts; do not
+list defect/warranty or preference-exchange rules unless the customer asks about them.
 """
 
 
@@ -86,8 +95,11 @@ class Agent:
         now = datetime.now(ZoneInfo('America/Campo_Grande')).isoformat()
         messages = [{'role': 'system', 'content': PROMPT + '\nCurrent local time: ' + now}] + pending
         try:
-            for _ in range(6):
-                response = self.backend.complete(messages=messages, tools=TOOLS)
+            context = normalize(message + ' ' + ' '.join(m['content'] for m in self.history[-4:] if m['role'] == 'user'))
+            policy_followup = any(term in context for term in ('return', 'refund', 'regret', 'received', 'unused', 'online', 'devolver', 'arrependimento'))
+            for step in range(6):
+                response = self.backend.complete(messages=messages, tools=TOOLS,
+                    tool_choice='required' if policy_followup and step == 0 else 'auto')
                 calls = response.get('tool_calls') or []
                 if not calls:
                     answer = (response.get('content') or '').strip()

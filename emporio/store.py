@@ -30,7 +30,11 @@ class Store:
         categories = {r['category_id']: r['name'] for r in self.rows('categories')}
         promotions = self.rows('promotions')
         aliases = {'violao': 'violoes', 'guitar': 'guitarras', 'acoustic': 'violoes', 'bass': 'baixos', 'keyboard': 'teclados', 'ukulele': 'ukuleles'}
-        tokens = [aliases.get(t, t) for t in normalize(query).split()]
+        normalized_query = normalize(query)
+        for phrase in ('acoustic guitars', 'acoustic guitar', 'classical guitars', 'classical guitar'):
+            normalized_query = normalized_query.replace(phrase, 'violoes')
+        generic_terms = {'instrument', 'instruments', 'instrumento', 'instrumentos', 'product', 'products', 'available', 'options'}
+        tokens = [aliases.get(t, t) for t in normalized_query.split() if t not in generic_terms]
         results = []
         if max_price is not None and (not Decimal(str(max_price)).is_finite() or Decimal(str(max_price)) < 0):
             raise ValueError('max_price must be a finite nonnegative number')

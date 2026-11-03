@@ -51,3 +51,10 @@ def test_policy_retrieval_english_and_portuguese():
     policies = Policies()
     for query in ['Can I return my order?', 'Posso devolver meu pedido?']:
         assert 4 in [m['page'] for m in policies.search(query)['matches']]
+
+
+def test_compound_english_category_matches_portuguese_catalog():
+    store = Store()
+    expected = store.products('violão', 1000)['total_matches']
+    for query in ['acoustic guitar', 'acoustic guitars', 'classical guitar', 'acoustic instruments']:
+        assert store.products(query, 1000)['total_matches'] == expected > 0

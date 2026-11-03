@@ -93,3 +93,14 @@ def test_all_parallel_calls_receive_results_before_next_completion():
     agent.reply('orders?')
     outputs = [x for x in backend.requests[1]['messages'] if x['role'] == 'tool']
     assert [x['tool_call_id'] for x in outputs] == ['c1', 'c2']
+
+
+def test_return_followup_requires_new_tool_lookup():
+    backend = ScriptedBackend([call('search_policies', '{"query":"returns"}'), response('Please confirm receipt date'),
+                               call('search_policies', '{"query":"returns"}'), response('Policy fixture')])
+    agent = Agent(backend)
+    agent.reply('Can I return my order?')
+    agent.reply('It arrived three days ago.')
+    assert backend.requests[0]['tool_choice'] == 'required'
+    assert backend.requests[2]['tool_choice'] == 'required'
+    assert backend.requests[3]['tool_choice'] == 'auto'

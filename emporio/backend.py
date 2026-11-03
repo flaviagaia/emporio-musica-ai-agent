@@ -22,12 +22,12 @@ class LiteLLMBackend:
         if mode == 'groq' and not os.getenv('GROQ_API_KEY', '').strip():
             raise ConfigurationError('GROQ_API_KEY is missing. Run python -m emporio.configure locally, or use --mode mock.')
 
-    def complete(self, messages, tools):
+    def complete(self, messages, tools, tool_choice='auto'):
         # Avoid LiteLLM downloading the model-cost catalog even in mock mode.
         os.environ['LITELLM_LOCAL_MODEL_COST_MAP'] = 'True'
         from litellm import completion
         options = dict(model=self.model, messages=messages, tools=tools,
-                       tool_choice='auto', parallel_tool_calls=False,
+                       tool_choice=tool_choice, parallel_tool_calls=False,
                        temperature=0, max_tokens=1200, timeout=30, num_retries=0)
         if self.mode == 'mock':
             message = mock_message(messages)
