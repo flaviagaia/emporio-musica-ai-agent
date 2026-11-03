@@ -104,3 +104,32 @@ def test_return_followup_requires_new_tool_lookup():
     assert backend.requests[0]['tool_choice'] == 'required'
     assert backend.requests[2]['tool_choice'] == 'required'
     assert backend.requests[3]['tool_choice'] == 'auto'
+
+
+def test_incomplete_response_is_safe_and_does_not_enter_history():
+    from emporio.backend import IncompleteResponseError
+    class Truncated:
+        def complete(self, **kwargs):
+            raise IncompleteResponseError('truncated fixture')
+    agent = Agent(Truncated())
+    assert 'incomplete' in agent.reply('What is the price?')
+    assert agent.last_error == 'incomplete_response'
+    assert agent.history == []
+
+
+def test_catalog_pagination_arguments_are_validated_at_the_tool_boundary():
+    agent = Agent(None)
+    args = {'query': 'violão', 'max_price': 1000, 'available_only': True, 'offset': 10}
+    assert agent.execute('search_products', args)['offset'] == 10
+    assert agent.execute('search_products', dict(args, offset=True)).get('error')
+    assert agent.execute('search_products', dict(args, offset=-1)).get('error')
+    assert agent.execute('search_products', dict(args, arbitrary_path='secret')).get('error')
+
+
+def test_invalid_new_turn_clears_previous_diagnostics_without_calling_model():
+    agent = Agent(None)
+    agent.last_trace = [{'tool': 'old_request'}]
+    agent.last_error = 'old_error'
+    assert 'between 1 and' in agent.reply(' ')
+    assert agent.last_trace == []
+    assert agent.last_error == 'invalid_message'

@@ -31,7 +31,8 @@ class Policies:
         normalized_query = normalize(query)
         withdrawal = any(t in normalized_query for t in ('withdrawal', 'regret', 'arrependimento', 'devolucao', 'devolver'))
         withdrawal = withdrawal or ('return' in normalized_query and not any(t in normalized_query for t in ('defect', 'warranty', 'defeito', 'garantia', 'exchange')))
-        if withdrawal:
+        other_return_policy = any(t in normalized_query for t in ('defect', 'defeito', 'warranty', 'garantia', 'exchange', 'troca'))
+        if withdrawal and not other_return_policy:
             for page, text in self.pages:
                 section = re.search(r'4\.1\s+Direito.*?(?=4\.2\s)', text, re.S)
                 if section:

@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from .store import Store, normalize
 from .policies import Policies
+from .backend import IncompleteResponseError
 
 PROMPT = """You are Mel, the friendly, practical customer-service assistant for Empório da Música,
 a musical-instrument shop in Campo Grande, Brazil. Speak in English for this evaluation.
@@ -42,16 +43,17 @@ list defect/warranty or preference-exchange rules unless the customer asks about
 """
 
 
-def function(name, description, properties):
+def function(name, description, properties, *, optional=()):
     return {'type': 'function', 'function': {'name': name, 'description': description,
             'parameters': {'type': 'object', 'properties': properties,
-                           'required': list(properties), 'additionalProperties': False}}}
+                           'required': [key for key in properties if key not in optional], 'additionalProperties': False}}}
 
 
 TOOLS = [
-    function('search_products', 'Look up product models or categories, prices, stock and active promotions. Use brief search terms, not a sentence.', {
-        'query': {'type': 'string'}, 'max_price': {'type': ['number', 'null']},
-        'available_only': {'type': 'boolean'}}),
+    function('search_products', 'Look up products, prices and stock. Use promotion_only=true to find active offers, and next_offset to page through matches. Use brief search terms.', {
+        'query': {'type': 'string'}, 'max_price': {'type': ['number', 'null'], 'minimum': 0},
+        'available_only': {'type': 'boolean'}, 'promotion_only': {'type': 'boolean'},
+        'offset': {'type': 'integer', 'minimum': 0}}, optional=('promotion_only', 'offset')),
     function('search_policies', 'Retrieve source PDF pages for policies, hours, address, payment and returns. Search in English or Portuguese.', {
         'query': {'type': 'string'}}),
     function('get_order', 'Read an order owned by the already authenticated customer. Chat cannot authenticate a customer.', {
@@ -70,13 +72,21 @@ class Agent:
         self.last_error = None
 
     def execute(self, name, args):
+        if not isinstance(args, dict):
+            return {'error': 'invalid_tool_or_arguments'}
         try:
-            if name == 'search_products' and set(args) == {'query', 'max_price', 'available_only'}:
+            catalog_required = {'query', 'max_price', 'available_only'}
+            catalog_allowed = catalog_required | {'promotion_only', 'offset'}
+            if name == 'search_products' and catalog_required <= set(args) <= catalog_allowed:
                 if not isinstance(args['query'], str) or type(args['available_only']) is not bool:
                     raise ValueError('Invalid product arguments')
                 price = args['max_price']
                 if price is not None and (type(price) not in (int, float) or not math.isfinite(price) or price < 0):
                     raise ValueError('Invalid budget')
+                if type(args.get('promotion_only', False)) is not bool:
+                    raise ValueError('Invalid promotion flag')
+                if type(args.get('offset', 0)) is not int or args.get('offset', 0) < 0:
+                    raise ValueError('Invalid offset')
                 return self.store.products(**args)
             if name == 'search_policies' and set(args) == {'query'} and isinstance(args['query'], str):
                 return self.policies.search(**args)
@@ -89,11 +99,12 @@ class Agent:
             return {'error': 'data_unavailable', 'message': 'Unable to retrieve reliable data. Refer to the team.'}
 
     def reply(self, message):
-        if not message.strip() or len(message) > 4000:
-            return 'Please send a message between 1 and 4,000 characters.'
-        pending = self.history + [{'role': 'user', 'content': message}]
         self.last_trace = []
         self.last_error = None
+        if not message.strip() or len(message) > 4000:
+            self.last_error = 'invalid_message'
+            return 'Please send a message between 1 and 4,000 characters.'
+        pending = self.history + [{'role': 'user', 'content': message}]
         now = datetime.now(ZoneInfo('America/Campo_Grande')).isoformat()
         messages = [{'role': 'system', 'content': PROMPT + '\nCurrent local time: ' + now}] + pending
         try:
@@ -127,6 +138,9 @@ class Agent:
                                      'content': json.dumps(result, ensure_ascii=False)})
             self.last_error = 'lookup_limit'
             return 'This request needs help from the store team; I reached my lookup limit.'
+        except IncompleteResponseError:
+            self.last_error = 'incomplete_response'
+            return 'The model response was incomplete. Please try a shorter question or contact the store team.'
         except Exception as error:
             # Retain a non-sensitive category for CLI/capture; never raw provider errors.
             self.last_error = 'rate_limit' if getattr(error, 'status_code', None) == 429 else 'provider_failure'

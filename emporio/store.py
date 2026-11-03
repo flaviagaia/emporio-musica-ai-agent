@@ -1,6 +1,7 @@
 """Typed read-only access to the supplied operational snapshot."""
 import csv
 import json
+import re
 import unicodedata
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
@@ -26,15 +27,19 @@ class Store:
         with (self.data_dir / f'{table}.csv').open(encoding='utf-8-sig', newline='') as f:
             return list(csv.DictReader(f))
 
-    def products(self, query='', max_price=None, available_only=True):
+    def products(self, query='', max_price=None, available_only=True, promotion_only=False, offset=0):
+        if type(offset) is not int or offset < 0:
+            raise ValueError('offset must be a nonnegative integer')
+        if type(promotion_only) is not bool or type(available_only) is not bool:
+            raise ValueError('catalog flags must be boolean')
         categories = {r['category_id']: r['name'] for r in self.rows('categories')}
         promotions = self.rows('promotions')
-        aliases = {'violao': 'violoes', 'guitar': 'guitarras', 'acoustic': 'violoes', 'bass': 'baixos', 'keyboard': 'teclados', 'ukulele': 'ukuleles'}
+        aliases = {'violao': 'violoes', 'guitar': 'guitarras', 'guitars': 'guitarras', 'acoustic': 'violoes', 'bass': 'baixos', 'keyboard': 'teclados', 'ukulele': 'ukuleles'}
         normalized_query = normalize(query)
         for phrase in ('acoustic guitars', 'acoustic guitar', 'classical guitars', 'classical guitar'):
             normalized_query = normalized_query.replace(phrase, 'violoes')
         generic_terms = {'instrument', 'instruments', 'instrumento', 'instrumentos', 'product', 'products', 'available', 'options'}
-        tokens = [aliases.get(t, t) for t in normalized_query.split() if t not in generic_terms]
+        tokens = [aliases.get(t, t) for t in re.findall(r'[a-z0-9]+', normalized_query) if t not in generic_terms]
         results = []
         if max_price is not None and (not Decimal(str(max_price)).is_finite() or Decimal(str(max_price)) < 0):
             raise ValueError('max_price must be a finite nonnegative number')
@@ -49,6 +54,8 @@ class Store:
             discounts = [Decimal(p['discount_percent']) for p in promotions
                          if p['product_id'] == row['product_id'] and p['is_active'] == '1']
             discount = max(discounts, default=Decimal(0)) if available else Decimal(0)
+            if promotion_only and not discount:
+                continue
             price = Decimal(row['price_brl'])
             current = Decimal(money(price * (1 - discount / 100)))
             if max_price is not None and current > Decimal(str(max_price)):
@@ -62,8 +69,10 @@ class Store:
                                 specs=json.loads(row['specs'])))
         results.sort(key=lambda x: (Decimal(x['price_brl']), x['product_id']))
         return {'source': 'products.csv + categories.csv + promotions.csv (supplied snapshot)',
-                'total_matches': len(results), 'products': results[:10],
-                'note': 'At most 10 cheapest matches. Not a live inventory integration. Active flag is authoritative; no promotion dates were supplied.'}
+                'total_matches': len(results), 'offset': offset,
+                'next_offset': offset + 10 if offset + 10 < len(results) else None,
+                'products': results[offset:offset + 10],
+                'note': 'At most 10 matches per page, sorted by current price. Use next_offset for more results; promotion_only filters before paging. Not a live inventory integration. Active flag is authoritative; no promotion dates were supplied.'}
 
     def order(self, order_id, trusted_customer_id=None):
         # Identity comes from the application, not the LLM, a name or a phone in chat.

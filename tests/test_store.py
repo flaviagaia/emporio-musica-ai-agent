@@ -67,3 +67,40 @@ def test_online_withdrawal_retrieval_separates_exchange_exceptions():
     assert match['page'] == 4 and match['section'] == '4.1'
     assert '7 (sete) dias' in match['text']
     assert '4.4' not in match['text'] and 'venda final' not in match['text']
+
+
+def test_catalog_pagination_can_reach_every_match_without_duplicates():
+    store = Store()
+    first = store.products('violão', 1000)
+    second = store.products('violão', 1000, offset=first['next_offset'])
+    ids = [p['product_id'] for p in first['products'] + second['products']]
+    assert len(ids) == first['total_matches'] == len(set(ids))
+    assert second['next_offset'] is None
+
+
+def test_promotions_are_filtered_before_the_ten_product_limit(tmp_path):
+    import csv
+    import shutil
+    from emporio.store import DATA
+    for path in DATA.glob('*.csv'):
+        shutil.copy(path, tmp_path / path.name)
+    store = Store(tmp_path)
+    expensive = next(row for row in store.rows('products')
+                     if row['status'] == 'active' and int(row['stock_quantity']) > 0
+                     and Decimal(row['price_brl']) > 2000)
+    with (tmp_path / 'promotions.csv').open('a', newline='') as stream:
+        csv.writer(stream).writerow([999, expensive['product_id'], 10, 'Test offer', 1])
+    result = store.products(promotion_only=True)
+    assert int(expensive['product_id']) in [p['product_id'] for p in result['products']]
+    assert all(Decimal(p['discount_percent']) > 0 for p in result['products'])
+
+
+def test_defect_return_queries_do_not_retrieve_only_withdrawal_policy():
+    policies = Policies()
+    for query in ['posso devolver um produto com defeito?', 'return and warranty for defective item']:
+        result = policies.search(query)
+        assert any('4.2' in match['text'] for match in result['matches'])
+
+
+def test_exact_model_search_tolerates_question_punctuation():
+    assert Store().products('Yamaha C40?')['products'][0]['product_id'] == 81

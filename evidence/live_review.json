@@ -21,5 +21,14 @@
     "examples/promotion.md",
     "examples/returns.md",
     "examples/boundaries.md"
-  ]
+  ],
+  "code_review": {
+    "automated_tests": 32,
+    "targeted_live_checks": {
+      "promotion": "The model used promotion_only=true and retrieved all four active offers before selecting the Ohana CK-20. Price 439.20 and non-stacking PIX verified.",
+      "catalog_paging": "The model fetched offset 0 then offset 10: fourteen total matches including two unavailable models. The second page completed the result set without duplicates; availability was explicitly labeled.",
+      "defect_exchange": "A defect query retrieved section 4.2 and exchange rules, not withdrawal section 4.1 alone."
+    },
+    "additional_protection": "Incomplete/token-truncated completions are rejected; the mock now also asks for missing packaging/accessory facts."
+  }
 }

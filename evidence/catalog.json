@@ -2,6 +2,8 @@
   "budget_search": {
     "source": "products.csv + categories.csv + promotions.csv (supplied snapshot)",
     "total_matches": 12,
+    "offset": 0,
+    "next_offset": 10,
     "products": [
       {
         "product_id": 83,
@@ -224,11 +226,13 @@
         }
       }
     ],
-    "note": "At most 10 cheapest matches. Not a live inventory integration. Active flag is authoritative; no promotion dates were supplied."
+    "note": "At most 10 matches per page, sorted by current price. Use next_offset for more results; promotion_only filters before paging. Not a live inventory integration. Active flag is authoritative; no promotion dates were supplied."
   },
   "follow_up": {
     "source": "products.csv + categories.csv + promotions.csv (supplied snapshot)",
     "total_matches": 1,
+    "offset": 0,
+    "next_offset": null,
     "products": [
       {
         "product_id": 81,
@@ -253,6 +257,6 @@
         }
       }
     ],
-    "note": "At most 10 cheapest matches. Not a live inventory integration. Active flag is authoritative; no promotion dates were supplied."
+    "note": "At most 10 matches per page, sorted by current price. Use next_offset for more results; promotion_only filters before paging. Not a live inventory integration. Active flag is authoritative; no promotion dates were supplied."
   }
 }
