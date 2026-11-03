@@ -1,5 +1,7 @@
 # Mel - Empório da Música
 
+Public repository: [flaviagaia/emporio-musica-ai-agent](https://github.com/flaviagaia/emporio-musica-ai-agent).
+
 A Python customer-service agent for Artefact's AI Engineer technical case.
 Mel combines LLM function calling, deterministic operational lookups and page-level retrieval over the supplied policy PDF. The interface is a small CLI; the focus is grounded answers and explicit uncertainty.
 
