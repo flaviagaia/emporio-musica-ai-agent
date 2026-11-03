@@ -72,7 +72,7 @@ python -m emporio.capture --mode groq --output live_examples
 
 Mock captures use LiteLLM's `mock_response` facility to simulate both model tool requests and final replies. Only the model is simulated: `Agent` dispatches actual product, policy and order tools. Mock routing and prose are hand-authored for the documented scenarios, with dynamic product prices/stock and order results. Unknown messages get a clear offline-demo limitation. This is not a free-form intelligent assistant and is never presented as one.
 
-The five checked-in mock captures cover catalog search and follow-up PIX pricing; address and opening hours; active promotions without PIX stacking; conditional returns; and scope/privacy boundaries. `examples/01_*.md` through `05_*.md` additionally contain manually authored expected dialogues and executed source evidence; `python -m emporio.evidence` regenerates those files. Neither set is labeled as a real model transcript.
+The five checked-in mock captures cover catalog search and follow-up PIX pricing; address and opening hours; active promotions without PIX stacking; conditional returns; and scope/privacy boundaries. `python -m emporio.evidence` regenerates supporting tool results as JSON in `evidence/`; these are source evidence, not additional conversations. Mock conversations are not labeled as real model transcripts.
 
 The Groq capture command consumes API quota, writes actual responses and tool names, and stops on provider failures, rate limits, empty output or lookup exhaustion. Partial files are not validated examples. Review real captures for correctness before copying approved evidence into the repository and submitting. No measured model accuracy, latency or cost claim is made.
 
