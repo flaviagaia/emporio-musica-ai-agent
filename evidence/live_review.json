@@ -1,0 +1,25 @@
+{
+  "review_date": "2026-11-03",
+  "model": "groq/qwen/qwen3.8-27b",
+  "reviewer": "OpenAI Codex authoring agent; candidate approval pending",
+  "scope": "Five real Groq conversations, nine user turns; source checks and qualitative review only",
+  "scenarios": {
+    "catalog": "Checked the ten returned available acoustic-guitar matches, budget, listed prices and stock; C40 PIX 569.91 from list 599.90.",
+    "address": "Address, weekday/Saturday hours and holiday closure agree with policy PDF page 2.",
+    "promotion": "Ohana CK-20 list 549.00, active 20% price 439.20, six units, PIX not stacked; Kala comparison also checked.",
+    "returns": "Rechecked after restricting withdrawal retrieval to PDF section 4.1. Both turns re-query policies, ask for unconfirmed packaging/accessories/manuals and leave unspecified refund-clock start to staff.",
+    "boundaries": "Refuses customer email disclosure and accessory request; anonymous order lookup returns authentication requirement."
+  },
+  "limitations": [
+    "Small manually reviewed demonstration, not an accuracy metric.",
+    "Other initial captures were not selected for delivery when review exposed unsupported statements.",
+    "No claim of adversarial robustness or production authentication."
+  ],
+  "selected_files": [
+    "examples/catalog.md",
+    "examples/address.md",
+    "examples/promotion.md",
+    "examples/returns.md",
+    "examples/boundaries.md"
+  ]
+}

@@ -28,6 +28,16 @@ class Policies:
             self.pages = [(i + 1, page.get_text()) for i, page in enumerate(pdf)]
 
     def search(self, query):
+        normalized_query = normalize(query)
+        withdrawal = any(t in normalized_query for t in ('withdrawal', 'regret', 'arrependimento', 'devolucao', 'devolver'))
+        withdrawal = withdrawal or ('return' in normalized_query and not any(t in normalized_query for t in ('defect', 'warranty', 'defeito', 'garantia', 'exchange')))
+        if withdrawal:
+            for page, text in self.pages:
+                section = re.search(r'4\.1\s+Direito.*?(?=4\.2\s)', text, re.S)
+                if section:
+                    return {'source': 'store_policies.pdf, version 2.1 (June 2025)',
+                            'matches': [{'page': page, 'section': '4.1', 'text': section.group(0).strip()}],
+                            'note': 'Online withdrawal section only. Exchange exceptions are a different policy; do not transfer them to withdrawal refunds. Ask for missing purchase/receipt facts. The refund clock start is unspecified; staff must confirm.'}
         terms = tokens(query)
         expanded = set(terms)
         for term in terms:

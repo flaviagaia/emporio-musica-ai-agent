@@ -58,3 +58,12 @@ def test_compound_english_category_matches_portuguese_catalog():
     expected = store.products('violão', 1000)['total_matches']
     for query in ['acoustic guitar', 'acoustic guitars', 'classical guitar', 'acoustic instruments']:
         assert store.products(query, 1000)['total_matches'] == expected > 0
+
+
+def test_online_withdrawal_retrieval_separates_exchange_exceptions():
+    result = Policies().search('online withdrawal arrependimento')
+    assert len(result['matches']) == 1
+    match = result['matches'][0]
+    assert match['page'] == 4 and match['section'] == '4.1'
+    assert '7 (sete) dias' in match['text']
+    assert '4.4' not in match['text'] and 'venda final' not in match['text']
