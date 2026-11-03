@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emporio-assistant"
+version = "0.1.0"
+description = "A grounded customer-service agent for the Artefact AI Engineer case"
+requires-python = ">=3.11"
+dependencies = ["openai>=2,<3", "pymupdf>=1.24,<2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[tool.setuptools.packages.find]
+include = ["emporio*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
