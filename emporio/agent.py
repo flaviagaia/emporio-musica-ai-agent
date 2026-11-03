@@ -32,9 +32,9 @@ states a 24-business-hour return target; you have no ticket-creation integration
 
 
 def function(name, description, properties):
-    return {'type': 'function', 'name': name, 'description': description, 'strict': True,
+    return {'type': 'function', 'function': {'name': name, 'description': description,
             'parameters': {'type': 'object', 'properties': properties,
-                           'required': list(properties), 'additionalProperties': False}}
+                           'required': list(properties), 'additionalProperties': False}}}
 
 
 TOOLS = [
@@ -49,12 +49,14 @@ TOOLS = [
 
 
 class Agent:
-    def __init__(self, client, model='gpt-4.1-mini', trusted_customer_id=None, store=None, policies=None):
-        self.client, self.model = client, model
+    def __init__(self, backend, trusted_customer_id=None, store=None, policies=None):
+        self.backend = backend
+        self.model = getattr(backend, 'model', 'test-fixture')
         self.trusted_customer_id = trusted_customer_id
         self.store, self.policies = store or Store(), policies or Policies()
         self.history = []
         self.last_trace = []
+        self.last_error = None
 
     def execute(self, name, args):
         try:
@@ -80,34 +82,40 @@ class Agent:
             return 'Please send a message between 1 and 4,000 characters.'
         pending = self.history + [{'role': 'user', 'content': message}]
         self.last_trace = []
+        self.last_error = None
         now = datetime.now(ZoneInfo('America/Campo_Grande')).isoformat()
+        messages = [{'role': 'system', 'content': PROMPT + '\nCurrent local time: ' + now}] + pending
         try:
-            for step in range(6):
-                response = self.client.responses.create(
-                    model=self.model, instructions=PROMPT + '\nCurrent local time: ' + now,
-                    input=pending, tools=TOOLS, store=False,
-                    max_output_tokens=1800, parallel_tool_calls=False,
-                    tool_choice='required' if step == 0 else 'auto')
-                pending.extend(response.output)
-                calls = [item for item in response.output if item.type == 'function_call']
+            for _ in range(6):
+                response = self.backend.complete(messages=messages, tools=TOOLS)
+                calls = response.get('tool_calls') or []
                 if not calls:
-                    answer = response.output_text.strip()
+                    answer = (response.get('content') or '').strip()
                     if not answer:
+                        self.last_error = 'empty_response'
                         return 'I could not produce a reliable answer. Please contact the store team.'
-                    # Keep only final dialogue; source data is refreshed at every new turn.
                     self.history = (self.history + [{'role': 'user', 'content': message},
                                      {'role': 'assistant', 'content': answer}])[-16:]
                     return answer
-                for call in calls[:4]:
+                if len(calls) > 4:
+                    break
+                # Send only documented chat fields back to the provider.
+                messages.append({'role': 'assistant', 'content': response.get('content'), 'tool_calls': calls})
+                for call in calls:
+                    name = call['function']['name']
                     try:
-                        args = json.loads(call.arguments)
-                        result = self.execute(call.name, args) if isinstance(args, dict) else {'error': 'invalid_arguments'}
+                        args = json.loads(call['function']['arguments'])
+                        result = self.execute(name, args) if isinstance(args, dict) else {'error': 'invalid_arguments'}
                     except (json.JSONDecodeError, TypeError):
                         args, result = {}, {'error': 'invalid_arguments'}
-                    self.last_trace.append({'tool': call.name, 'arguments': args, 'result': result})
-                    pending.append({'type': 'function_call_output', 'call_id': call.call_id,
-                                    'output': json.dumps(result, ensure_ascii=False)})
+                    self.last_trace.append({'tool': name, 'arguments': args, 'result': result})
+                    messages.append({'role': 'tool', 'tool_call_id': call['id'],
+                                     'content': json.dumps(result, ensure_ascii=False)})
+            self.last_error = 'lookup_limit'
             return 'This request needs help from the store team; I reached my lookup limit.'
-        except Exception:
-            # Do not leak tokens, provider errors, customer records or stack traces to chat.
+        except Exception as error:
+            # Retain a non-sensitive category for CLI/capture; never raw provider errors.
+            self.last_error = 'rate_limit' if getattr(error, 'status_code', None) == 429 else 'provider_failure'
+            if self.last_error == 'rate_limit':
+                return 'The free API request limit has been reached. Please try again later. No fallback provider was called.'
             return 'The assistant service is unavailable. Please try again or contact the store team.'
