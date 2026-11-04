@@ -3,6 +3,19 @@ from decimal import Decimal
 
 LANGUAGES = {'en': 'English', 'pt': 'Português'}
 PT = {
+    'Guided demo': 'Demonstração guiada', 'Chat with Mel': 'Conversar com a Mel',
+    'Try example questions.': 'Experimente perguntas de exemplo.',
+    'Ask your own questions.': 'Faça suas próprias perguntas.',
+    'Explore instruments, prices and store information with Mel.': 'Explore instrumentos, preços e informações da loja com a Mel.',
+    'Chat is temporarily unavailable. You can use the guided demo.': 'A conversa está indisponível no momento. Você pode usar a demonstração guiada.',
+    'Mel could not complete your request. Please try again in a moment.': 'A Mel não conseguiu concluir seu pedido. Tente novamente em instantes.',
+    'Find your instrument and compare prices and availability.': 'Encontre seu instrumento e compare preços e disponibilidade.',
+    'Confirm prices and availability with the store. PIX and promotional discounts cannot be combined.': 'Confirme preços e disponibilidade com a loja. Descontos de PIX e promoções não se acumulam.',
+    'Confirm prices and availability with the store.': 'Confirme preços e disponibilidade com a loja.',
+    'Contact the store for the latest order information.': 'Entre em contato com a loja para atualizar as informações do pedido.',
+    'This is a demonstration with fictional store data. Confirm prices, availability and order details with the store.': 'Esta é uma demonstração com dados fictícios. Confirme preços, disponibilidade e detalhes dos pedidos com a loja.',
+    'Your conversation is kept only while this page stays open.': 'Sua conversa fica salva apenas enquanto esta página estiver aberta.',
+
     'Candidate prototype': 'Protótipo do processo seletivo',
     'Candidate prototype · Artefact case': 'Protótipo do processo seletivo · Case Artefact',
     'Workspace': 'Navegação', 'Chat': 'Conversa', 'Catalog': 'Catálogo', 'Store guide': 'Guia da loja',

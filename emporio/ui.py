@@ -27,6 +27,10 @@ def t(text):
     return translate(text, st.session_state.get('language', 'en'))
 
 
+def mode_name(value, language):
+    return translate({'Offline mock': 'Guided demo', 'Groq · real model': 'Chat with Mel'}[value], language)
+
+
 def money(value):
     return format_money(value, st.session_state.get('language', 'en'))
 
@@ -69,7 +73,6 @@ def create_agent(mode, settings):
 
 def sources(trace, technical=False):
     if not trace:
-        st.caption(t('No lookup was needed for this reply.'))
         return
     labels = list(dict.fromkeys(t(TOOL_NAMES.get(step['tool'], step['tool'])) for step in trace))
     with st.expander(t('Sources consulted · ') + ' / '.join(labels)):
@@ -90,10 +93,10 @@ def sources(trace, technical=False):
                                    t('Available'): p['available']} for p in products], hide_index=True, width='stretch')
                 else:
                     st.caption(t('No matching instruments in this lookup.'))
-                st.caption(t('Supplied catalog snapshot.') if st.session_state.get('language') == 'pt' else result.get('note', 'Supplied catalog snapshot.'))
+                st.caption(t('Confirm prices and availability with the store.'))
             elif step['tool'] == 'get_order':
                 st.write({t('Order'): result['order_id'], t('Status'): t(result['status']), t('Tracking'): result.get('tracking_code')})
-                st.caption(t('Historical order snapshot.') if st.session_state.get('language') == 'pt' else result.get('note', 'Historical order snapshot.'))
+                st.caption(t('Contact the store for the latest order information.'))
             if technical:
                 st.json({'tool': step['tool'], 'arguments': step['arguments']})
 
@@ -103,7 +106,7 @@ def render_chat(mode, settings, show_sources, technical):
     if not records:
         st.markdown(f'<div class="hero-panel"><div class="eyebrow">{t("YOUR NEXT CHAPTER STARTS WITH A NOTE")}</div><h1 class="hero-title">{t("Find your next sound.")}</h1>'
                     f'<div class="hero-copy">{t("Hi, I’m Mel. Let’s find the right instrument, check a price, or work through a store question together.")}</div>'
-                    f'<div class="mode-pill"><span class="mode-dot"></span>{t("Offline mock · no API calls") if mode == "mock" else t("Real model · Groq")}</div></div>', unsafe_allow_html=True)
+                    f'<div class="mode-pill"><span class="mode-dot"></span>{t("Guided demo") if mode == "mock" else t("Chat with Mel")}</div></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="section-label">{t("Start with a question")}</div>', unsafe_allow_html=True)
         with st.container(key='starter_actions'):
             icons = ['search', 'payments', 'local_offer', 'assignment_return']
@@ -112,10 +115,9 @@ def render_chat(mode, settings, show_sources, technical):
                 for index, (column, (label, question)) in enumerate(zip(columns, SUGGESTIONS[row * 2:row * 2 + 2])):
                     column.button(t(label), key='suggest_' + str(row) + label, on_click=queue_question,
                                   args=(t(question),), icon=f':material/{icons[row * 2 + index]}:', width='stretch')
-        st.caption(t('Prices and availability come from the supplied store snapshot. Responses follow your selected language; English is the evaluation default.'))
+        st.caption(t('Explore instruments, prices and store information with Mel.'))
     else:
         st.subheader(t('Your conversation with Mel'))
-        st.caption(t('Offline mock · scripted responses') if mode == 'mock' else t('Groq · real model responses'))
     for record in records:
         render_turn(record, show_sources, technical)
     ready = mode == 'mock' or bool(settings.api_key)
@@ -125,7 +127,7 @@ def render_chat(mode, settings, show_sources, technical):
     if not question:
         return
     if not ready:
-        st.info(t('Choose Offline mock, or configure GROQ_API_KEY on this server to use Groq.'))
+        st.info(t('Chat is temporarily unavailable. You can use the guided demo.'))
         return
     signature = (mode, settings.model, settings.demo_customer_id,
                  hashlib.sha256(settings.api_key.encode()).hexdigest())
@@ -136,7 +138,7 @@ def render_chat(mode, settings, show_sources, technical):
             st.session_state.agent = create_agent(mode, settings)
             st.session_state.agent.history = previous_history
         except ConfigurationError:
-            st.error(t('The model connection is not configured correctly. Check the server settings or use Offline mock.'))
+            st.error(t('Chat is temporarily unavailable. You can use the guided demo.'))
             return
         st.session_state.agent_signature = signature
     with st.chat_message('user'):
@@ -163,19 +165,17 @@ def render_turn(record, show_sources, technical):
 def render_answer(record, show_sources, technical):
     with st.chat_message('assistant', avatar=':material/music_note:'):
         # Currency symbols must remain literal instead of opening Markdown math.
-        st.markdown(record['answer'].replace('$', r'\$'))
-        st.caption(t("{count} source lookup(s) · {seconds}s").format(count=len(record["trace"]), seconds=f'{record["elapsed"]:.1f}'))
-        if record.get("language", "en") != st.session_state.get("language", "en"):
-            st.caption(t("Reply language: {language}").format(language=LANGUAGES[record.get("language", "en")]))
         if record['error']:
-            st.warning(t('This request did not complete successfully. You can change your question and try again; no automatic retry was made.'))
-        if show_sources:
+            st.warning(t('Mel could not complete your request. Please try again in a moment.'))
+        else:
+            st.markdown(record['answer'].replace('$', r'\$'))
+        if show_sources and not record['error']:
             sources(record['trace'], technical)
 
 
 def render_catalog():
     st.markdown(f'<div class="eyebrow">{t("THE INSTRUMENT COLLECTION")}</div><h1 class="hero-title">{t("Make room for music.")}</h1>'
-                f'<div class="hero-copy">{t("Explore the store snapshot. Every price, offer and stock count below comes directly from the supplied catalog.")}</div>', unsafe_allow_html=True)
+                f'<div class="hero-copy">{t("Find your instrument and compare prices and availability.")}</div>', unsafe_allow_html=True)
     store = Store()
     categories = store.rows('categories')
     category_options = {'All instruments': ''} | {CATEGORY_LABELS[r['category_id']]: r['name'] for r in categories}
@@ -220,7 +220,7 @@ def render_catalog():
     controls[1].caption(t("Showing {start}–{end} of {count}").format(start=offset + 1, end=min(offset + 10, count), count=count))
     controls[2].button(t('Next'), key='catalog_next', disabled=result['next_offset'] is None,
                        on_click=move_catalog_page, args=(result['next_offset'],), width='stretch')
-    st.caption(t('Snapshot data, not live inventory. PIX and promotional discounts are not cumulative.'))
+    st.caption(t('Confirm prices and availability with the store. PIX and promotional discounts cannot be combined.'))
 
 
 def render_guide():
@@ -260,27 +260,21 @@ def run_app():
         st.caption(t('Language changes apply to new replies. Existing messages are kept.'))
         view = st.radio(t('Workspace'), ['Chat', 'Catalog', 'Store guide'], format_func=partial(translate, language=st.session_state.language), key='workspace', label_visibility='collapsed', on_change=reset_catalog_page)
         st.divider()
-        mode_label = st.radio(t('Response mode'), ['Offline mock', 'Groq · real model'], format_func=partial(translate, language=st.session_state.language), key='response_mode',
-                              captions=[t('Scripted demo. No API calls.'), t('Open-ended conversation. Uses API quota.')], on_change=clear_conversation)
+        mode_label = st.radio(t('Response mode'), ['Offline mock', 'Groq · real model'], format_func=partial(mode_name, language=st.session_state.language), key='response_mode',
+                              captions=[t('Try example questions.'), t('Ask your own questions.')], on_change=clear_conversation)
         mode = 'mock' if mode_label == 'Offline mock' else 'groq'
-        if mode == 'mock':
-            st.caption(t('Mock supports the example scenarios and runs real local lookups.'))
-        elif settings.api_key:
-            st.caption(t('Groq connection configured on this server.'))
-        else:
-            st.warning(t('Groq key not configured. Use Offline mock or configure GROQ_API_KEY on the server.'))
-        st.caption(t('Demo session · fictional customer #{customer}').format(customer=settings.demo_customer_id) if settings.demo_customer_id else t('Guest session · order details require sign-in'))
+        if mode == 'groq' and not settings.api_key:
+            st.warning(t('Chat is temporarily unavailable. You can use the guided demo.'))
         st.button(t('New conversation'), on_click=clear_conversation, width='stretch')
         st.download_button(t('Download conversation'), data=transcript(st.session_state.records, mode, settings.model, st.session_state.language),
                            file_name='Mel - Conversation.md', mime='text/markdown', disabled=not st.session_state.records,
                            on_click='ignore', width='stretch')
         with st.expander(t('View options')):
             show_sources = st.checkbox(t('Show sources with replies'), value=True, key='show_sources')
-            technical = st.checkbox(t('Show technical lookup details'), value=False, key='technical')
+            technical = False
         with st.expander(t('About this demo')):
-            st.caption(t('Python agent · Groq via LiteLLM · CSV lookups · PDF policy retrieval.'))
-            st.caption(t('Session-only history. The model sees the latest eight exchanges; the screen keeps up to 40 turns. Reloading or starting a new conversation clears the session.'))
-            st.caption(t('The store and data are fictional. A demo customer ID is a server-side fixture, not production authentication. Keep a Groq account on its Free plan to use the free quota.'))
+            st.caption(t('This is a demonstration with fictional store data. Confirm prices, availability and order details with the store.'))
+            st.caption(t('Your conversation is kept only while this page stays open.'))
             st.link_button(t('View project on GitHub'), 'https://github.com/flaviagaia/emporio-musica-ai-agent')
     st.markdown(f'<div class="case-header"><div class="case-wordmark">ARTEFACT<span> /</span></div>'
                 f'<div class="case-label">{t("Candidate prototype")}<br>DATA &amp; AI · FLÁVIA GAIA</div></div>', unsafe_allow_html=True)

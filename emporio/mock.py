@@ -76,7 +76,7 @@ def mock_summary(query, result, language='en'):
         for p in products:
             availability = f"{p['stock_quantity']} units" if p['available'] else p['status'] + ', unavailable'
             lines.append(f"{p['name']}: BRL {p['price_brl']} (list BRL {p['list_price_brl']}; discount {p['discount_percent']}%; PIX BRL {p['pix_price_brl']}; {availability}).")
-        return '\n'.join(lines) + '\nSource: supplied CSV snapshot, not live inventory. Promotional and PIX discounts do not stack.'
+        return '\n'.join(lines) + '\nSource: store catalog. Confirm prices and availability with the store. Promotional and PIX discounts do not stack.'
     if 'order_id' in result:
         return (f"Order {result['order_id']} status: {result['status']}. "
                 f"Tracking: {result['tracking_code'] or 'not available'}. "
@@ -128,7 +128,7 @@ def mock_summary_pt(query, result):
         for p in products:
             stock = f"{p['stock_quantity']} unidades em estoque" if p['available'] else 'indisponível: ' + translate(p['status'], 'pt')
             lines.append(f"{p['name']}: R$ {format_money(p['price_brl'], 'pt')} (tabela: R$ {format_money(p['list_price_brl'], 'pt')}; desconto: {p['discount_percent']}%; PIX: R$ {format_money(p['pix_price_brl'], 'pt')}; {stock}).")
-        return '\n'.join(lines) + '\nFonte: base de catálogo fornecida, sem conexão ao estoque ao vivo. PIX e descontos promocionais não se acumulam.'
+        return '\n'.join(lines) + '\nFonte: catálogo da loja. Confirme preços e disponibilidade com a equipe. PIX e descontos promocionais não se acumulam.'
     if 'order_id' in result:
         return (f"Pedido {result['order_id']}: {translate(result['status'], 'pt')}. "
                 f"Rastreamento: {result.get('tracking_code') or 'não disponível'}. "

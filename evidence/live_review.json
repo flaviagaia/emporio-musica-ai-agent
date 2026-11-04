@@ -82,5 +82,15 @@
       "English and Portuguese retained; no model or tool behavior changed"
     ],
     "validation": "46 automated tests passed. Browser inspection of home, catalog and mock price conversation. Local server remains at 127.0.0.1:8510."
+  },
+  "customer_copy_review": {
+    "review_date": "2026-11-04",
+    "automated_tests": 47,
+    "changes": [
+      "Removed per-reply tool-call count, latency, and language diagnostics.",
+      "Removed technical JSON controls and server/API implementation notes from customer navigation.",
+      "Renamed modes to Guided demo and Chat with Mel in both languages.",
+      "Kept optional business sources and simplified data freshness and error messages."
+    ]
   }
 }

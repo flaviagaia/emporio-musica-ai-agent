@@ -41,7 +41,7 @@ def test_reruns_do_not_repeat_model_calls_or_messages():
     at.chat_input[0].set_value('What is the store address?').run()
     agent = at.session_state['agent']
     before = len(agent.history)
-    at.checkbox(key='technical').check().run()
+    at.checkbox(key='show_sources').uncheck().run()
     assert not at.exception
     assert len(at.session_state['records']) == 1
     assert len(agent.history) == before
@@ -175,3 +175,14 @@ def test_portuguese_catalog_and_guide_actions_keep_stable_navigation():
     assert not at.exception
     assert at.radio(key='workspace').value == 'Chat'
     assert 'O manual lista PIX' in at.session_state['records'][-1]['answer']
+
+
+def test_customer_interface_hides_technical_diagnostics():
+    at = app()
+    assert 'Guided demo' in at.radio(key='response_mode').options
+    assert not any(item.key == 'technical' for item in at.checkbox)
+    at.chat_input[0].set_value('Yamaha C40 price?').run()
+    captions = '\n'.join(item.value for item in at.caption)
+    assert 'source lookup(s)' not in captions
+    assert 'API' not in captions and 'Groq' not in captions
+    assert not at.exception
