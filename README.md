@@ -36,13 +36,9 @@ Configuration precedence is environment variables, Streamlit server secrets, the
 
 The server binds to **127.0.0.1** by default. This project provides a local application, not an externally hosted service. External deployment requires a Python-capable host and an appropriate access/secret configuration; no hosted deployment is claimed. `requirements.txt` installs the UI dependencies from the source checkout.
 
-Order requests are anonymous by default and remain access-controlled. For a controlled fictional demonstration only:
+The Streamlit interface always uses a guest identity for order requests. It does not use `EMPORIO_DEMO_CUSTOMER_ID` to authenticate visitors, and visitors cannot choose an identity in the UI. Anonymous order lookups are denied.
 
-```bash
-EMPORIO_DEMO_CUSTOMER_ID=3 streamlit run streamlit_app.py
-```
-
-The sidebar labels this as a demo fixture, not real sign-in. Visitors cannot choose an identity in the UI. Do not use the fixture for actual customer access.
+For a controlled fictional order demonstration, use the explicit CLI fixture documented under **Order access** below. It is not production authentication.
 
 The guided demo supports bilingual instrument categories, budgets, model references such as “C70”, simple comparisons, follow-ups, payments, shipping, defect/exchange requests and online withdrawal. Unsupported requests receive a clarification instead of a different instrument category. It remains a scripted simulator; choose Groq for unrestricted natural-language interpretation. The CLI remains available below.
 
@@ -80,7 +76,7 @@ python -m emporio.configure
 python -m emporio --mode groq --trace
 ```
 
-The configuration command saves a new `.env` file with owner-only file permissions, and refuses to overwrite an existing file. The CLI loads only this project's `.env`; existing environment variables take precedence. `.env.example` documents the settings:
+The configuration command saves a new `.env` file with owner-only file permissions, and refuses to overwrite an existing file. The CLI loads the `.env` from its settings directory: the project root in a source checkout, or `~/.config/mel` in an installed distribution, unless `EMPORIO_CONFIG_DIR` is set. Existing environment variables take precedence. `.env.example` documents the settings:
 
 ```text
 GROQ_API_KEY=<your key, locally only>
