@@ -41,7 +41,7 @@ def test_reruns_do_not_repeat_model_calls_or_messages():
     at.chat_input[0].set_value('What is the store address?').run()
     agent = at.session_state['agent']
     before = len(agent.history)
-    at.checkbox(key='show_sources').uncheck().run()
+    at.checkbox(key='show_sources').check().run()
     assert not at.exception
     assert len(at.session_state['records']) == 1
     assert len(agent.history) == before
@@ -153,7 +153,7 @@ def test_language_switch_keeps_history_and_changes_new_replies_and_export():
     assert at.session_state['agent'] is agent
     assert len(agent.history) == 4
     record = at.session_state['records'][-1]
-    assert '569,91' in record['answer'] and 'Fonte:' in record['answer']
+    assert '569,91' in record['answer'] and 'Fonte:' not in record['answer']
     assert record['language'] == 'pt'
     exported = transcript(at.session_state['records'], 'mock', 'fixture', 'pt')
     assert 'Idioma: Português' in exported and original['answer'] in exported

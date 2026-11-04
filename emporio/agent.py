@@ -63,10 +63,11 @@ TOOLS = [
 
 
 class Agent:
-    def __init__(self, backend, trusted_customer_id=None, store=None, policies=None, language='en'):
+    def __init__(self, backend, trusted_customer_id=None, store=None, policies=None, language='en', inline_sources=True):
         if language not in ('en', 'pt'):
             raise ValueError('Unsupported language')
         self.language = language
+        self.inline_sources = inline_sources
         self.backend = backend
         self.model = getattr(backend, 'model', 'test-fixture')
         self.trusted_customer_id = trusted_customer_id
@@ -112,6 +113,9 @@ class Agent:
         now = datetime.now(ZoneInfo('America/Campo_Grande')).isoformat()
         output_language = 'Brazilian Portuguese' if self.language == 'pt' else 'English'
         prompt = PROMPT.replace('Respond in English.', f'Respond in {output_language} for this conversation.')
+        if not self.inline_sources:
+            prompt = prompt.replace('Cite PDF page numbers in policy answers.', 'Reference details are displayed separately by the application. Do not include source labels, citations, page numbers or tool names in your reply.')
+            prompt += '\nWrite natural customer-facing prose. Use short paragraphs. For prices, put the instrument name first, then price and PIX price on separate lines. Omit zero discounts and repeated list prices. Avoid dense parentheses, tables, technical notes and unnecessary bullet points. Use ordinary text and bold only; no LaTeX or math delimiters.\n[CHAT_PRESENTATION]'
         messages = [{'role': 'system', 'content': prompt + f'\n[OUTPUT_LANGUAGE:{self.language}]\nCurrent local time: ' + now}] + pending
         try:
             context = normalize(message + ' ' + ' '.join(m['content'] for m in self.history[-4:] if m['role'] == 'user'))

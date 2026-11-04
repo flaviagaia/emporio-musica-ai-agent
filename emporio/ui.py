@@ -11,6 +11,7 @@ from .backend import LiteLLMBackend, ConfigurationError
 from .policies import Policies
 from .store import Store, DATA
 from .ui_support import CATEGORY_LABELS, load_settings, transcript
+from .presentation import chat_markdown
 from .i18n import translate, format_money, LANGUAGES
 
 MAX_VISIBLE_TURNS = 40
@@ -68,7 +69,7 @@ def configured_settings():
 
 def create_agent(mode, settings):
     return Agent(LiteLLMBackend(mode=mode, model=settings.model, api_key=settings.api_key),
-                 trusted_customer_id=settings.demo_customer_id)
+                 trusted_customer_id=settings.demo_customer_id, inline_sources=False)
 
 
 def sources(trace, technical=False):
@@ -131,7 +132,7 @@ def render_chat(mode, settings, show_sources, technical):
         return
     signature = (mode, settings.model, settings.demo_customer_id,
                  hashlib.sha256(settings.api_key.encode()).hexdigest())
-    if st.session_state.get('agent_signature') != signature or not hasattr(st.session_state.get('agent'), 'language'):
+    if st.session_state.get('agent_signature') != signature or not hasattr(st.session_state.get('agent'), 'inline_sources'):
         previous_agent = st.session_state.get('agent')
         previous_history = getattr(previous_agent, 'history', []).copy() if st.session_state.get('agent_signature') == signature else []
         try:
@@ -168,7 +169,7 @@ def render_answer(record, show_sources, technical):
         if record['error']:
             st.warning(t('Mel could not complete your request. Please try again in a moment.'))
         else:
-            st.markdown(record['answer'].replace('$', r'\$'))
+            st.markdown(chat_markdown(record['answer']))
         if show_sources and not record['error']:
             sources(record['trace'], technical)
 
@@ -270,7 +271,7 @@ def run_app():
                            file_name='Mel - Conversation.md', mime='text/markdown', disabled=not st.session_state.records,
                            on_click='ignore', width='stretch')
         with st.expander(t('View options')):
-            show_sources = st.checkbox(t('Show sources with replies'), value=True, key='show_sources')
+            show_sources = st.checkbox(t('Show sources with replies'), value=False, key='show_sources')
             technical = False
         with st.expander(t('About this demo')):
             st.caption(t('This is a demonstration with fictional store data. Confirm prices, availability and order details with the store.'))

@@ -5,7 +5,7 @@ Public repository: [flaviagaia/emporio-musica-ai-agent](https://github.com/flavi
 A bilingual music-store assistant built with Python, Streamlit and tool-grounded AI. A portfolio project by Flávia Gaia.
 Mel combines LLM function calling, deterministic operational lookups and page-level retrieval over the supplied policy PDF. The primary interface is a Streamlit application with chat, catalog exploration and a searchable policy guide. A CLI is also included. Both use the same Python agent and business tools.
 
-**Validation status:** 47 local automated tests pass, including a fresh-process test that blocks socket connections in mock mode. Five real Groq conversations (nine user turns) were captured on 3 November 2026 and reviewed against the supplied CSV/PDF sources; they are in `examples/`. These are a small functional demonstration, not a statistical quality evaluation. Mock mode remains the default and does not call the API.
+**Validation status:** 50 local automated tests pass, including a fresh-process test that blocks socket connections in mock mode. Five real Groq conversations (nine user turns) were captured on 3 November 2026 and reviewed against the supplied CSV/PDF sources; they are in `examples/`. These are a small functional demonstration, not a statistical quality evaluation. Mock mode remains the default and does not call the API.
 
 ## Open the Streamlit interface
 
@@ -24,7 +24,7 @@ Mel has its own visual identity: a deep navy sidebar, violet/pink accents, a gra
 
 The application includes:
 
-- **Chat:** example questions, a bounded session conversation, source evidence under each reply, safe provider-error messages, a new-conversation control and a Markdown transcript download. A mode change starts a new conversation so mock and real outputs are not mixed. Reruns and downloads do not resubmit messages.
+- **Chat:** example questions, a bounded session conversation, optional source evidence, readable price paragraphs, safe provider-error messages, a new-conversation control and a Markdown transcript download. Chat replies keep source citations in the optional evidence panel and use literal currency formatting. A mode change starts a new conversation so mock and real outputs are not mixed. Reruns and downloads do not resubmit messages.
 - **Catalog:** search, category and budget filters, availability/promotion filters, paginated product cards, specifications and a button that opens the selected instrument in chat. Browsing is deterministic and uses no model quota.
 - **Store guide:** quick topics, lexical PDF search, original page/section evidence, a policy-to-chat action and a download of the supplied manual.
 

@@ -91,5 +91,17 @@
       "Renamed modes to Guided demo and Chat with Mel in both languages.",
       "Kept optional business sources and simplified data freshness and error messages."
     ]
+  },
+  "chat_readability_review": {
+    "review_date": "2026-11-04",
+    "automated_tests": 50,
+    "changes": [
+      "Short price paragraphs without zero discounts or repeated list prices in guided chat.",
+      "Source citations separated from the reply and evidence display disabled by default.",
+      "Currency escaping is idempotent, preserving literal R$ and ordinary text formatting.",
+      "Chat-specific instructions for the real model; CLI retains inline evidence.",
+      "Single model line breaks render as visible breaks instead of collapsing into one sentence."
+    ],
+    "browser_checks": "Portuguese price question verified in guided mode and with the real Groq model; correct C40 price 599.90 and PIX 569.91, no inline source label."
   }
 }

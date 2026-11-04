@@ -3,6 +3,7 @@ import json
 import re
 from .store import normalize, Store
 from .i18n import translate, format_money
+from .presentation import chat_prose, product_reply
 
 def tool_call(name, args):
     return {'role': 'assistant', 'content': None, 'tool_calls': [{
@@ -21,12 +22,17 @@ def mock_message(messages):
     Tools still run in Agent; prices, stock and order status come from their results.
     """
     language = 'pt' if any(m['role'] == 'system' and '[OUTPUT_LANGUAGE:pt]' in m['content'] for m in messages) else 'en'
+    chat = any(m['role'] == 'system' and '[CHAT_PRESENTATION]' in m['content'] for m in messages)
     def reply(text):
-        return answer(translate(text, language))
+        text = translate(text, language)
+        return answer(chat_prose(text) if chat else text)
     user = next(m['content'] for m in reversed(messages) if m['role'] == 'user')
     query = normalize(user)
     if messages[-1]['role'] == 'tool':
-        return reply(mock_summary(query, json.loads(messages[-1]['content']), language))
+        result = json.loads(messages[-1]['content'])
+        if chat and result.get('products'):
+            return reply(product_reply(result['products'], language))
+        return reply(mock_summary(query, result, language))
     if any(x in query for x in ('ignore your', 'all customers', 'customer emails', 'all customer', 'ignore as instrucoes', 'todos os clientes', 'emails dos clientes')):
         return reply('I cannot share customer records. I can help with instruments and store policies.')
     if any(x in query for x in ('cable', 'cabos', 'palheta', 'amplifier', 'amplificador', 'cordas avulsas')):
