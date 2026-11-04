@@ -1,0 +1,18 @@
+[server]
+address = "127.0.0.1"
+port = 8510
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "viewer"
+
+[theme]
+base = "light"
+primaryColor = "#245448"
+backgroundColor = "#F8F7F2"
+secondaryBackgroundColor = "#EFEEE7"
+textColor = "#20372F"
+font = "sans serif"

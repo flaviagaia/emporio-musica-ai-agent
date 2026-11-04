@@ -13,14 +13,15 @@ class ConfigurationError(ValueError):
 
 
 class LiteLLMBackend:
-    def __init__(self, mode='mock', model=None):
+    def __init__(self, mode='mock', model=None, api_key=None):
         if mode not in ('mock', 'groq'):
             raise ConfigurationError('Mode must be mock or groq.')
         self.mode = mode
         self.model = model or os.getenv('GROQ_MODEL', DEFAULT_MODEL)
         if not self.model.startswith('groq/'):
             raise ConfigurationError('This project only permits groq/ models; paid-provider fallback is disabled.')
-        if mode == 'groq' and not os.getenv('GROQ_API_KEY', '').strip():
+        self.api_key = api_key if api_key is not None else os.getenv('GROQ_API_KEY', '')
+        if mode == 'groq' and not self.api_key.strip():
             raise ConfigurationError('GROQ_API_KEY is missing. Run python -m emporio.configure locally, or use --mode mock.')
 
     def complete(self, messages, tools, tool_choice='auto'):
@@ -35,6 +36,8 @@ class LiteLLMBackend:
             message = mock_message(messages)
             options['mock_response'] = {'choices': [{'index': 0, 'message': message,
                 'finish_reason': 'tool_calls' if message.get('tool_calls') else 'stop'}]}
+        if self.mode == 'groq':
+            options['api_key'] = self.api_key
         # SDK only; no proxy, router, automatic retries, cache or paid fallback.
         result = completion(**options)
         choice = result.choices[0]

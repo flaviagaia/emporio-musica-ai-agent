@@ -1,0 +1,2 @@
+# Streamlit deployment / local UI installation from the repository root.
+-e .[ui]

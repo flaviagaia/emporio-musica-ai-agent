@@ -30,5 +30,31 @@
       "defect_exchange": "A defect query retrieved section 4.2 and exchange rules, not withdrawal section 4.1 alone."
     },
     "additional_protection": "Incomplete/token-truncated completions are rejected; the mock now also asks for missing packaging/accessory facts."
+  },
+  "streamlit_review": {
+    "review_date": "2026-11-03",
+    "streamlit_version": "1.66.1",
+    "total_automated_tests": 42,
+    "browser_checks": [
+      "Offline starter price lookup rendered actual CSV facts and source controls.",
+      "Selecting Groq cleared the mock conversation and recognized the configured server-side key.",
+      "Real Groq chat returned Yamaha C40 PIX price 569.91, list price 599.90, 12 units, and the snapshot qualification.",
+      "Catalog search for Yamaha C40 returned one correctly priced instrument and disabled unnecessary pagination.",
+      "Home and catalog layouts visually inspected; navigation verified."
+    ],
+    "automated_ui_checks": [
+      "Keyless mock conversation",
+      "No duplicated requests on rerun",
+      "Mode switch resets context",
+      "Missing-key Groq mode blocks send",
+      "Catalog filtering and pagination",
+      "Product-to-chat routing",
+      "PDF source search and policy-to-chat routing",
+      "Independent sessions",
+      "Secret-free exports",
+      "Safe provider failures",
+      "Explicit API key is scoped per backend instance"
+    ],
+    "deployment": "Local Streamlit server bound to 127.0.0.1. No externally hosted deployment is claimed."
   }
 }

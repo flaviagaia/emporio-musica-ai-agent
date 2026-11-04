@@ -1,0 +1,271 @@
+"""Streamlit interface over the same Agent used by the CLI."""
+import hashlib
+import html
+import math
+from pathlib import Path
+import time
+import streamlit as st
+from .agent import Agent
+from .backend import LiteLLMBackend, ConfigurationError
+from .policies import Policies
+from .store import Store, DATA
+from .ui_support import CATEGORY_LABELS, load_settings, transcript
+
+MAX_VISIBLE_TURNS = 40
+SUGGESTIONS = [
+    ('Find an acoustic guitar', 'Which acoustic instruments are available for up to BRL 1000?'),
+    ('Check a price', 'What is the PIX price of the Yamaha C40?'),
+    ('See active offers', 'Show one instrument with an active promotion and explain whether PIX adds a discount.'),
+    ('Ask about returns', 'I regret my purchase. Can I return my order?'),
+]
+TOOL_NAMES = {'search_products': 'Product catalog', 'search_policies': 'Store policy', 'get_order': 'Order lookup'}
+
+
+def clear_conversation():
+    for key in ('agent', 'agent_signature', 'pending_question'):
+        st.session_state.pop(key, None)
+    st.session_state.records = []
+
+
+def queue_question(question):
+    st.session_state.pending_question = question
+    st.session_state.workspace = 'Chat'
+
+
+def reset_catalog_page():
+    st.session_state.catalog_offset = 0
+
+
+def move_catalog_page(offset):
+    st.session_state.catalog_offset = offset
+
+
+def select_guide(query):
+    st.session_state.guide_query = query
+
+
+def configured_settings():
+    try:
+        secrets = dict(st.secrets)
+    except FileNotFoundError:
+        secrets = {}
+    return load_settings(secrets=secrets)
+
+
+def create_agent(mode, settings):
+    return Agent(LiteLLMBackend(mode=mode, model=settings.model, api_key=settings.api_key),
+                 trusted_customer_id=settings.demo_customer_id)
+
+
+def sources(trace, technical=False):
+    if not trace:
+        st.caption('No lookup was needed for this reply.')
+        return
+    labels = list(dict.fromkeys(TOOL_NAMES.get(t['tool'], t['tool']) for t in trace))
+    with st.expander('Sources consulted · ' + ' / '.join(labels)):
+        for index, step in enumerate(trace, 1):
+            result = step['result']
+            st.markdown(f"**{index}. {TOOL_NAMES.get(step['tool'], 'Source lookup')}**")
+            if result.get('error'):
+                st.caption(result.get('message', 'This lookup could not retrieve reliable information.'))
+            elif step['tool'] == 'search_policies':
+                for match in result.get('matches', []):
+                    st.caption(f"Store manual · page {match['page']}" + (f" · section {match['section']}" if match.get('section') else ''))
+                    st.text(match['text'])
+            elif step['tool'] == 'search_products':
+                products = result.get('products', [])
+                if products:
+                    st.dataframe([{'Instrument': p['name'], 'Price (BRL)': p['price_brl'],
+                                   'PIX (BRL)': p['pix_price_brl'], 'Units': p['stock_quantity'],
+                                   'Available': p['available']} for p in products], hide_index=True, width='stretch')
+                else:
+                    st.caption('No matching instruments in this lookup.')
+                st.caption(result.get('note', 'Supplied catalog snapshot.'))
+            elif step['tool'] == 'get_order':
+                st.write({'Order': result['order_id'], 'Status': result['status'], 'Tracking': result.get('tracking_code')})
+                st.caption(result.get('note', 'Historical order snapshot.'))
+            if technical:
+                st.json({'tool': step['tool'], 'arguments': step['arguments']})
+
+
+def render_chat(mode, settings, show_sources, technical):
+    records = st.session_state.records
+    if not records:
+        st.markdown('<div class="eyebrow">YOUR NEXT CHAPTER STARTS WITH A NOTE</div><h1 class="hero-title">Find your next sound.</h1>'
+                    '<div class="hero-copy">Hi, I’m Mel. Let’s find the right instrument, check a price, or work through a store question together.</div>', unsafe_allow_html=True)
+        mode_text = 'Offline mock · no API calls' if mode == 'mock' else 'Real model · Groq'
+        st.markdown(f'<div class="mode-pill"><span class="mode-dot"></span>{mode_text}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Start with a question</div>', unsafe_allow_html=True)
+        for row in range(2):
+            columns = st.columns(2)
+            for column, (label, question) in zip(columns, SUGGESTIONS[row * 2:row * 2 + 2]):
+                column.button(label, key='suggest_' + str(row) + label, on_click=queue_question,
+                              args=(question,), width='stretch')
+        st.caption('Prices and availability come from the supplied store snapshot. Responses are in English for the evaluation.')
+    else:
+        st.subheader('Your conversation with Mel')
+        st.caption('Offline mock · scripted responses' if mode == 'mock' else 'Groq · real model responses')
+    for record in records:
+        render_turn(record, show_sources, technical)
+    ready = mode == 'mock' or bool(settings.api_key)
+    question = st.chat_input('Ask about an instrument, an order, or the store…', key='chat_prompt',
+                             max_chars=4000, disabled=not ready)
+    question = question or st.session_state.pop('pending_question', None)
+    if not question:
+        return
+    if not ready:
+        st.info('Choose Offline mock, or configure GROQ_API_KEY on this server to use Groq.')
+        return
+    signature = (mode, settings.model, settings.demo_customer_id,
+                 hashlib.sha256(settings.api_key.encode()).hexdigest())
+    if st.session_state.get('agent_signature') != signature:
+        try:
+            st.session_state.agent = create_agent(mode, settings)
+        except ConfigurationError:
+            st.error('The model connection is not configured correctly. Check the server settings or use Offline mock.')
+            return
+        st.session_state.agent_signature = signature
+    with st.chat_message('user'):
+        st.markdown(question)
+    agent = st.session_state.agent
+    started = time.monotonic()
+    with st.spinner('Mel is checking the store information…'):
+        answer = agent.reply(question)
+    record = {'question': question, 'answer': answer, 'trace': agent.last_trace.copy(),
+              'error': agent.last_error, 'elapsed': time.monotonic() - started}
+    st.session_state.records = (st.session_state.records + [record])[-MAX_VISIBLE_TURNS:]
+    render_answer(record, show_sources, technical)
+    # A rerun displays the updated download and transcript controls without resending the request.
+    st.rerun()
+
+
+def render_turn(record, show_sources, technical):
+    with st.chat_message('user'):
+        st.markdown(record['question'])
+    render_answer(record, show_sources, technical)
+
+
+def render_answer(record, show_sources, technical):
+    with st.chat_message('assistant', avatar=':material/music_note:'):
+        st.markdown(record['answer'])
+        st.caption(f"{len(record['trace'])} source lookup(s) · {record['elapsed']:.1f}s")
+        if record['error']:
+            st.warning('This request did not complete successfully. You can change your question and try again; no automatic retry was made.')
+        if show_sources:
+            sources(record['trace'], technical)
+
+
+def render_catalog():
+    st.markdown('<div class="eyebrow">THE INSTRUMENT COLLECTION</div><h1 class="hero-title">Make room for music.</h1>'
+                '<div class="hero-copy">Explore the store snapshot. Every price, offer and stock count below comes directly from the supplied catalog.</div>', unsafe_allow_html=True)
+    store = Store()
+    categories = store.rows('categories')
+    category_options = {'All instruments': ''} | {CATEGORY_LABELS[r['category_id']]: r['name'] for r in categories}
+    filters = st.columns([2, 1.4, 1.4])
+    query = filters[0].text_input('Search instruments', placeholder='Yamaha, Takamine, ukulele…', key='catalog_query', on_change=reset_catalog_page)
+    category = filters[1].selectbox('Category', list(category_options), key='catalog_category', on_change=reset_catalog_page)
+    highest_price = math.ceil(max(float(p['price_brl']) for p in store.rows('products')) / 100) * 100
+    budget = filters[2].number_input('Maximum price (BRL)', min_value=0, max_value=highest_price,
+                                    value=highest_price, step=100, key='catalog_budget', on_change=reset_catalog_page)
+    options = st.columns(2)
+    available = options[0].checkbox('Available instruments only', value=True, key='catalog_available', on_change=reset_catalog_page)
+    promotion = options[1].checkbox('Active promotions only', key='catalog_promotion', on_change=reset_catalog_page)
+    result = store.products(' '.join([category_options[category], query]).strip(), budget,
+                            available_only=available, promotion_only=promotion,
+                            offset=st.session_state.get('catalog_offset', 0))
+    count = result['total_matches']
+    st.caption(f"{count} matching instrument{'s' if count != 1 else ''} · sorted by current price")
+    if not result['products']:
+        st.info('No instruments match these filters. Try another name, raise your budget, or include unavailable items.')
+        return
+    for start in range(0, len(result['products']), 2):
+        columns = st.columns(2)
+        for column, product in zip(columns, result['products'][start:start + 2]):
+            with column.container(border=True):
+                category_label = next((CATEGORY_LABELS[r['category_id']] for r in categories if r['name'] == product['category']), product['category'])
+                st.markdown(f'<div class="product-category">{html.escape(category_label)}</div>'
+                            f'<div class="product-name">{html.escape(product["name"])}</div>'
+                            f'<div class="product-price">R$ {html.escape(product["price_brl"])}</div>', unsafe_allow_html=True)
+                if float(product['discount_percent']):
+                    st.markdown(f'<span class="product-original">R$ {html.escape(product["list_price_brl"])}</span>'
+                                f'<span class="product-promo">{html.escape(product["discount_percent"])}% off</span>', unsafe_allow_html=True)
+                st.caption(f"PIX R$ {product['pix_price_brl']} · {product['stock_quantity']} in stock" if product['available'] else f"Unavailable · {product['status']}")
+                with st.expander('Instrument details'):
+                    st.write(product['description'])
+                    st.json(product['specs'])
+                st.button('Ask Mel about this instrument', key=f'ask_product_{product["product_id"]}',
+                          on_click=queue_question, args=(f'What is the price and availability of {product["name"]}?',), width='stretch')
+    controls = st.columns([1, 2, 1])
+    offset = result['offset']
+    controls[0].button('Previous', key='catalog_previous', disabled=offset == 0,
+                       on_click=move_catalog_page, args=(max(0, offset - 10),), width='stretch')
+    controls[1].caption(f"Showing {offset + 1}–{min(offset + 10, count)} of {count}")
+    controls[2].button('Next', key='catalog_next', disabled=result['next_offset'] is None,
+                       on_click=move_catalog_page, args=(result['next_offset'],), width='stretch')
+    st.caption('Snapshot data, not live inventory. PIX and promotional discounts are not cumulative.')
+
+
+def render_guide():
+    st.markdown('<div class="eyebrow">A LITTLE CLARITY GOES A LONG WAY</div><h1 class="hero-title">The store guide.</h1>'
+                '<div class="hero-copy">Read the original policy evidence for opening hours, payments, shipping and returns. Ask Mel to explain it in English.</div>', unsafe_allow_html=True)
+    columns = st.columns(4)
+    for column, (label, query) in zip(columns, [('Opening hours', 'hours address'), ('Payments', 'payment installments'),
+                                               ('Returns', 'online withdrawal arrependimento'), ('Shipping', 'shipping delivery')]):
+        column.button(label, on_click=select_guide, args=(query,), width='stretch')
+    query = st.text_input('Search the store manual', value='hours address', key='guide_query')
+    if query.strip():
+        result = Policies().search(query)
+        matches = result['matches']
+        if not matches:
+            st.info('No policy pages matched. Try a different term or ask Mel for help.')
+        for index, match in enumerate(matches):
+            label = f"Store manual · page {match['page']}" + (f" · section {match['section']}" if match.get('section') else '')
+            with st.expander(label, expanded=index == 0):
+                st.text(match['text'])
+        st.caption('Original source: Portuguese policy manual, version 2.1, June 2025. Conflicting or unspecified rules require staff confirmation.')
+        st.button('Ask Mel about this policy', on_click=queue_question,
+                  args=(f'Please explain the store policy for: {query}',))
+    st.download_button('Download the original store manual', data=(DATA / 'store_policies.pdf').read_bytes(),
+                       file_name='Emporio da Musica - Store policies.pdf', mime='application/pdf')
+
+
+def run_app():
+    st.set_page_config(page_title='Mel | Empório da Música', page_icon=':material/music_note:', layout='wide')
+    st.markdown(Path(__file__).with_name('ui.css').read_text(), unsafe_allow_html=True)
+    settings = configured_settings()
+    if 'records' not in st.session_state:
+        st.session_state.records = []
+    with st.sidebar:
+        st.markdown('<div class="brand"><div class="brand-mark">m</div><div><div class="brand-name">Mel</div>'
+                    '<div class="brand-caption">EMPÓRIO DA MÚSICA</div></div></div>', unsafe_allow_html=True)
+        view = st.radio('Workspace', ['Chat', 'Catalog', 'Store guide'], key='workspace', label_visibility='collapsed', on_change=reset_catalog_page)
+        st.divider()
+        mode_label = st.radio('Response mode', ['Offline mock', 'Groq · real model'], key='response_mode',
+                              captions=['Scripted demo. No API calls.', 'Open-ended conversation. Uses API quota.'], on_change=clear_conversation)
+        mode = 'mock' if mode_label == 'Offline mock' else 'groq'
+        if mode == 'mock':
+            st.caption('Mock supports the example scenarios and runs real local lookups.')
+        elif settings.api_key:
+            st.caption('Groq connection configured on this server.')
+        else:
+            st.warning('Groq key not configured. Use Offline mock or configure GROQ_API_KEY on the server.')
+        st.caption(f'Demo session · fictional customer #{settings.demo_customer_id}' if settings.demo_customer_id else 'Guest session · order details require sign-in')
+        st.button('New conversation', on_click=clear_conversation, width='stretch')
+        st.download_button('Download conversation', data=transcript(st.session_state.records, mode, settings.model),
+                           file_name='Mel - Conversation.md', mime='text/markdown', disabled=not st.session_state.records,
+                           on_click='ignore', width='stretch')
+        with st.expander('View options'):
+            show_sources = st.checkbox('Show sources with replies', value=True, key='show_sources')
+            technical = st.checkbox('Show technical lookup details', value=False, key='technical')
+        with st.expander('About this demo'):
+            st.caption('Python agent · Groq via LiteLLM · CSV lookups · PDF policy retrieval.')
+            st.caption('Session-only history. The model sees the latest eight exchanges; the screen keeps up to 40 turns. Reloading or starting a new conversation clears the session.')
+            st.caption('The store and data are fictional. A demo customer ID is a server-side fixture, not production authentication. Keep a Groq account on its Free plan to use the free quota.')
+            st.link_button('View project on GitHub', 'https://github.com/flaviagaia/emporio-musica-ai-agent')
+    if view == 'Chat':
+        render_chat(mode, settings, show_sources, technical)
+    elif view == 'Catalog':
+        render_catalog()
+    else:
+        render_guide()
+    st.markdown('<div class="app-footer">Empório da Música · Your music starts here. &nbsp; | &nbsp; Artefact AI Engineer case</div>', unsafe_allow_html=True)

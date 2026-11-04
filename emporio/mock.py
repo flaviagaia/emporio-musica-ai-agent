@@ -1,7 +1,7 @@
 """Scripted offline simulator; real CSV/PDF tools are dispatched by Agent."""
 import json
 import re
-from .store import normalize
+from .store import normalize, Store
 
 def tool_call(name, args):
     return {'role': 'assistant', 'content': None, 'tool_calls': [{
@@ -30,6 +30,9 @@ def mock_message(messages):
     order = re.search(r'(?:order|pedido)\s*#?\s*(\d+)', query)
     if order and not any(x in query for x in ('return', 'refund', 'regret')):
         return tool_call('get_order', {'order_id': int(order.group(1))})
+    for product in Store().rows('products'):
+        if normalize(product['name']) in query:
+            return tool_call('search_products', {'query': product['name'], 'max_price': None, 'available_only': False})
     if 'c40' in query:
         return tool_call('search_products', {'query': 'Yamaha C40', 'max_price': None, 'available_only': False})
     if 'gd20' in query:
@@ -43,6 +46,10 @@ def mock_message(messages):
                                             'available_only': True})
     if any(x in query for x in ('address', 'endereco', 'hours', 'opening')):
         return tool_call('search_policies', {'query': 'endereco horario funcionamento'})
+    if any(x in query for x in ('payment', 'installment', 'pagamento', 'parcelamento')):
+        return tool_call('search_policies', {'query': 'pagamento parcelamento pix'})
+    if any(x in query for x in ('shipping', 'delivery', 'frete', 'entrega')):
+        return tool_call('search_policies', {'query': 'frete entrega'})
     if any(x in query for x in ('return', 'regret', 'received', 'refund', 'devolver')):
         return tool_call('search_policies', {'query': 'online return refund devolucao arrependimento'})
     return answer('Offline mock demo: try acoustic instruments up to BRL 1000, Yamaha C40 PIX price, store address, returns, or order 1. Use --mode groq for open-ended conversation.')
@@ -75,6 +82,12 @@ def mock_summary(query, result):
                 'Source: store policy, PDF page 2. Offline mock template checked against the retrieved page.')
     if any(x in query for x in ('cable', 'palheta', 'amplifier', 'cordas avulsas')) and 6 in pages:
         return 'We focus on musical instruments and do not sell cables or amplifiers. I can help you find an instrument. Source: store policy, PDF page 6.'
+    if any(x in query for x in ('payment', 'installment', 'pagamento', 'parcelamento')) and 3 in pages:
+        return ('The manual lists PIX, debit cards, credit cards and bank slips. PIX gives 5% off the list price; credit cards allow up to 12 interest-free installments. '
+                'The general table and detailed installment tiers have conflicting minimum amounts, so please confirm the installment conditions with staff. Source: PDF page 3.')
+    if any(x in query for x in ('shipping', 'delivery', 'frete', 'entrega')) and 4 in pages:
+        return ('For metropolitan Campo Grande, the manual states free shipping above BRL 500 and a BRL 35 fee below BRL 500, with an estimated 1–3 business days. '
+                'Exactly BRL 500 is not specified; please ask the team to confirm. Other destinations require a quote based on destination and parcel details. Source: PDF pages 4–5. These are policy estimates, not a live delivery promise.')
     if any(x in query for x in ('return', 'regret', 'received', 'refund', 'devolver')) and 4 in pages:
         if all(x in query for x in ('online', 'three days', 'unused', 'not customized')):
             return ('You are within the stated online return window. Please confirm the original packaging, accessories and manuals; unused does not establish those facts. '

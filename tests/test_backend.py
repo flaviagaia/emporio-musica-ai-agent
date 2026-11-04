@@ -93,3 +93,17 @@ def test_truncated_model_output_is_never_returned_as_a_complete_answer(monkeypat
     monkeypatch.setattr(litellm, 'completion', cut_off)
     with pytest.raises(IncompleteResponseError):
         LiteLLMBackend().complete([{'role': 'user', 'content': 'price?'}], [])
+
+
+def test_explicit_server_key_does_not_mutate_environment(monkeypatch):
+    monkeypatch.setenv('LITELLM_LOCAL_MODEL_COST_MAP', 'True')
+    monkeypatch.setenv('GROQ_API_KEY', 'other-session-placeholder')
+    import litellm
+    captured = {}
+    def completion(**kwargs):
+        captured.update(kwargs)
+        return litellm.ModelResponse(choices=[{'message': {'role': 'assistant', 'content': 'fixture'}}])
+    monkeypatch.setattr(litellm, 'completion', completion)
+    LiteLLMBackend(mode='groq', api_key='this-session-placeholder').complete([], [])
+    assert captured['api_key'] == 'this-session-placeholder'
+    assert os.environ['GROQ_API_KEY'] == 'other-session-placeholder'

@@ -3,9 +3,46 @@
 Public repository: [flaviagaia/emporio-musica-ai-agent](https://github.com/flaviagaia/emporio-musica-ai-agent).
 
 A Python customer-service agent for Artefact's AI Engineer technical case.
-Mel combines LLM function calling, deterministic operational lookups and page-level retrieval over the supplied policy PDF. The interface is a small CLI; the focus is grounded answers and explicit uncertainty.
+Mel combines LLM function calling, deterministic operational lookups and page-level retrieval over the supplied policy PDF. The primary interface is a Streamlit application with chat, catalog exploration and a searchable policy guide. A CLI is also included. Both use the same Python agent and business tools.
 
-**Validation status:** 32 local automated tests pass, including a fresh-process test that blocks socket connections in mock mode. Five real Groq conversations (nine user turns) were captured on 3 November 2026 and reviewed against the supplied CSV/PDF sources; they are in `examples/`. These are a small functional demonstration, not a statistical quality evaluation. Mock mode remains the default and does not call the API.
+**Validation status:** 42 local automated tests pass, including a fresh-process test that blocks socket connections in mock mode. Five real Groq conversations (nine user turns) were captured on 3 November 2026 and reviewed against the supplied CSV/PDF sources; they are in `examples/`. These are a small functional demonstration, not a statistical quality evaluation. Mock mode remains the default and does not call the API.
+
+## Open the Streamlit interface
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[ui,dev]'
+streamlit run streamlit_app.py
+```
+
+Open **http://127.0.0.1:8510**. The app defaults to **Offline mock**, so opening it and browsing the catalog do not call a model API. Select **Groq · real model** in the sidebar for open-ended conversation using a server-configured key. The interface and model responses are in English for the evaluation; original product descriptions and PDF evidence remain in Portuguese.
+
+![Streamlit home screen](docs/screenshots/home.jpg)
+
+The application includes:
+
+- **Chat:** example questions, a bounded session conversation, source evidence under each reply, optional tool arguments, safe provider-error messages, a new-conversation control and a Markdown transcript download. A mode change starts a new conversation so mock and real outputs are not mixed. Reruns and downloads do not resubmit messages.
+- **Catalog:** search, category and budget filters, availability/promotion filters, paginated product cards, specifications and a button that opens the selected instrument in chat. Browsing is deterministic and uses no model quota.
+- **Store guide:** quick topics, lexical PDF search, original page/section evidence, a policy-to-chat action and a download of the supplied manual.
+
+The small sidebar arrow opens navigation on a narrow screen. Model memory is limited to eight exchanges; the UI displays at most forty turns. History and agent instances are scoped to the browser session, not shared across visitors. A page reload clears that session. Exports include displayed conversation text and source names, never the configured key or internal prompt.
+
+### Streamlit configuration
+
+Configuration precedence is environment variables, Streamlit server secrets, then this project's ignored `.env`. The existing `python -m emporio.configure` command can configure the local Groq key. An example server secret file is included at `.streamlit/secrets.toml.example`; the actual `.streamlit/secrets.toml` is ignored by Git. The UI never asks visitors to enter or view the server key. Keys are passed per backend instance, without modifying process-wide API-key settings.
+
+The server binds to **127.0.0.1** by default. This project provides a local application, not an externally hosted service. External deployment requires a Python-capable host and an appropriate access/secret configuration; no hosted deployment is claimed. `requirements.txt` installs the UI dependencies from the source checkout.
+
+Order requests are anonymous by default and remain access-controlled. For a controlled fictional demonstration only:
+
+```bash
+EMPORIO_DEMO_CUSTOMER_ID=3 streamlit run streamlit_app.py
+```
+
+The sidebar labels this as a demo fixture, not real sign-in. Visitors cannot choose an identity in the UI. Do not use the fixture for actual customer access.
+
+The mock supports the starter questions, exact catalog model names, payments and shipping. It remains a scripted simulator; choose Groq for unrestricted natural-language interpretation. The CLI remains available below.
 
 ## Run without consuming API quota
 
@@ -78,13 +115,14 @@ The five checked-in real Groq captures cover catalog search and follow-up PIX pr
 
 The Groq capture command consumes API quota, writes actual responses and tool names, and stops on provider failures, rate limits, empty or truncated output, invalid input, or lookup exhaustion. Partial files are not validated examples. Review real captures for correctness before copying approved evidence into the repository and submitting. No statistical model-accuracy or measured latency/cost claim is made. Groq captures default to 25 seconds between request starts; `--interval` adjusts pacing within 0-60 seconds, and `--scenario returns` reruns only the chosen scenario. A failed capture stores tool evidence in its ignored output directory for diagnosis; failed dialogues must not be submitted.
 
-Tests cover inventory and budget filters; active/inactive promotions; PIX non-cumulativity; order ownership; fresh inventory reads; bilingual policy retrieval; the complete tool-message cycle; malformed arguments; identity injection; lookup bounds; provider failure; bounded history; multiple tool-call outputs; default mock routing; zero-network startup; required keys; provider allowlisting; 429 handling without retry/fallback; pagination without duplicate or lost matches; promotion filtering before pagination; defect-return retrieval; and rejection of truncated model output. Automated tests intercept the Groq adapter; the five separately captured live conversations provide manually reviewed integration evidence. These are distinct types of verification. A subsequent code review also ran four targeted live turns: promotion filtering, two-page catalog retrieval, and defective-item exchange. The review summary is in `evidence/live_review.json`.
+Tests cover inventory and budget filters; active/inactive promotions; PIX non-cumulativity; order ownership; fresh inventory reads; bilingual policy retrieval; the complete tool-message cycle; malformed arguments; identity injection; lookup bounds; provider failure; bounded history; multiple tool-call outputs; default mock routing; zero-network startup; required keys; provider allowlisting; 429 handling without retry/fallback; pagination without duplicate or lost matches; promotion filtering before pagination; defect-return retrieval; and rejection of truncated model output. Automated tests intercept the Groq adapter; the five separately captured live conversations provide manually reviewed integration evidence. Streamlit AppTest also verifies keyless mock use, mode/context reset, source viewing, filtering/pagination, catalog-to-chat and policy-to-chat actions, isolated sessions, export privacy, safe provider failures and absence of duplicate requests on reruns. A real browser session also verified a Groq price lookup and the catalog filter. These are distinct types of verification. A subsequent code review also ran four targeted live turns: promotion filtering, two-page catalog retrieval, and defective-item exchange. The review summary is in `evidence/live_review.json`.
 
 ## Architecture and decisions
 
 ```mermaid
 flowchart LR
-    CLI[CLI and session identity] --> Agent[Bounded Python LLM loop]
+    CLI[CLI and trusted session identity] --> Agent[Bounded Python LLM loop]
+    Web[Streamlit session] --> Agent
     Agent --> SDK[LiteLLM SDK]
     SDK --> Mode{Explicit mode}
     Mode --> Mock[Offline scripted mock]
@@ -118,10 +156,12 @@ flowchart LR
 
 ## Known limitations and next steps
 
-Five live Groq scenarios have been reviewed. This limited set does not establish broad generalization, injection resistance or factual reliability. The mock supports only a limited set of scripted scenarios. Expand evaluation of multilingual paraphrases, follow-up references, policy ambiguity and adversarial requests before production use. Authentication, a web UI, WhatsApp integration, ticket creation, checkout and real inventory APIs are intentionally not implemented. The prototype can explain a policy but cannot authorize refunds or submit complaints. There is no production monitoring, holiday-calendar service, semantic retrieval evaluation or concurrency control. The adapter rejects incomplete/token-truncated model responses rather than showing a cut-off answer as complete. The model can still misinterpret evidence; a production system needs evaluated guardrails and structured response validation.
+Five live Groq scenarios have been reviewed. This limited set does not establish broad generalization, injection resistance or factual reliability. The mock supports only a limited set of scripted scenarios. Expand evaluation of multilingual paraphrases, follow-up references, policy ambiguity and adversarial requests before production use. Production authentication, WhatsApp integration, ticket creation, checkout and real inventory APIs are intentionally not implemented. The Streamlit UI is a working local demonstration, not an authenticated public storefront. The prototype can explain a policy but cannot authorize refunds or submit complaints. There is no production monitoring, holiday-calendar service, semantic retrieval evaluation or concurrency control. The adapter rejects incomplete/token-truncated model responses rather than showing a cut-off answer as complete. The model can still misinterpret evidence; a production system needs evaluated guardrails and structured response validation.
 
-Next steps: have the candidate review the saved live conversations; add a broader gold evaluation set; resolve policy conflicts with the owner; replace the demo identity with verified sessions; then add a minimal web/WhatsApp adapter and observability with redacted logs. The SDK and Pydantic compatibility versions are pinned; requirements-tested.txt records the complete installed local environment without its editable absolute path. It is an environment snapshot, not a cross-platform lockfile.
+Next steps: have the candidate review the saved live conversations; add a broader gold evaluation set; resolve policy conflicts with the owner; replace the demo identity with verified sessions; then add an authenticated WhatsApp adapter and observability with redacted logs. The SDK and Pydantic compatibility versions are pinned; requirements-tested.txt records the complete installed local environment without its editable absolute path. It is an environment snapshot, not a cross-platform lockfile.
 
 ## AI coding assistance disclosure
 
-OpenAI Codex assisted with reading the assignment, drafting Python code, business-rule review, automated tests, documentation, the LiteLLM/Groq migration and labeled mock examples. The work was developed in successive local commits representing actual implementation stages. Five actual Groq conversations were subsequently captured and reviewed by the authoring agent. They replaced the earlier explicitly labeled mock examples. Live validation exposed compound English category matching and mixing of exchange/withdrawal policies; these prompted targeted search fixes, section-specific retrieval and regression tests. The candidate has not yet approved the final submission. The candidate should review and understand the implementation, validate live examples, and revise decisions as needed before submission.
+OpenAI Codex assisted with reading the assignment, drafting Python code, business-rule review, automated tests, documentation, the LiteLLM/Groq migration, labeled mock examples and the Streamlit interface. The work was developed in successive local commits representing actual implementation stages. Five actual Groq conversations were subsequently captured and reviewed by the authoring agent. They replaced the earlier explicitly labeled mock examples. Live validation exposed compound English category matching and mixing of exchange/withdrawal policies; these prompted targeted search fixes, section-specific retrieval and regression tests. The candidate has not yet approved the final submission. The candidate should review and understand the implementation, validate live examples, and revise decisions as needed before submission.
+
+UI references: [Streamlit chat elements](https://docs.streamlit.io/develop/api-reference/chat), [Session State](https://docs.streamlit.io/develop/api-reference/caching-and-state/st.session_state), and [AppTest](https://docs.streamlit.io/develop/api-reference/app-testing/st.testing.v1.apptest).
