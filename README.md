@@ -18,6 +18,8 @@ streamlit run streamlit_app.py
 
 Open **http://127.0.0.1:8510**. The app defaults to **Offline mock**, so opening it and browsing the catalog do not call a model API. Select **Groq · real model** in the sidebar for open-ended conversation using a server-configured key. Use **Language / Idioma** in the sidebar to choose **English** or **Português** for the interface and new replies, in both mock and Groq modes. English remains the evaluation default. Switching language keeps the existing conversation; earlier messages are not translated. Labels are translated locally without API calls. Original product descriptions and PDF evidence keep their source language.
 
+The visual design takes inspiration from [Artefact’s website](https://www.artefact.com/): a deep navy sidebar, violet/pink accents, a gradient hero and clear typography. The header identifies this as a candidate prototype. Both languages share the same styling.
+
 ![Streamlit home screen](docs/screenshots/home.jpg)
 
 The application includes:

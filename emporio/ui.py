@@ -101,16 +101,17 @@ def sources(trace, technical=False):
 def render_chat(mode, settings, show_sources, technical):
     records = st.session_state.records
     if not records:
-        st.markdown(f'<div class="eyebrow">{t("YOUR NEXT CHAPTER STARTS WITH A NOTE")}</div><h1 class="hero-title">{t("Find your next sound.")}</h1>'
-                    f'<div class="hero-copy">{t("Hi, I’m Mel. Let’s find the right instrument, check a price, or work through a store question together.")}</div>', unsafe_allow_html=True)
-        mode_text = t('Offline mock · no API calls') if mode == 'mock' else t('Real model · Groq')
-        st.markdown(f'<div class="mode-pill"><span class="mode-dot"></span>{mode_text}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="hero-panel"><div class="eyebrow">{t("YOUR NEXT CHAPTER STARTS WITH A NOTE")}</div><h1 class="hero-title">{t("Find your next sound.")}</h1>'
+                    f'<div class="hero-copy">{t("Hi, I’m Mel. Let’s find the right instrument, check a price, or work through a store question together.")}</div>'
+                    f'<div class="mode-pill"><span class="mode-dot"></span>{t("Offline mock · no API calls") if mode == "mock" else t("Real model · Groq")}</div></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="section-label">{t("Start with a question")}</div>', unsafe_allow_html=True)
-        for row in range(2):
-            columns = st.columns(2)
-            for column, (label, question) in zip(columns, SUGGESTIONS[row * 2:row * 2 + 2]):
-                column.button(t(label), key='suggest_' + str(row) + label, on_click=queue_question,
-                              args=(t(question),), width='stretch')
+        with st.container(key='starter_actions'):
+            icons = ['search', 'payments', 'local_offer', 'assignment_return']
+            for row in range(2):
+                columns = st.columns(2)
+                for index, (column, (label, question)) in enumerate(zip(columns, SUGGESTIONS[row * 2:row * 2 + 2])):
+                    column.button(t(label), key='suggest_' + str(row) + label, on_click=queue_question,
+                                  args=(t(question),), icon=f':material/{icons[row * 2 + index]}:', width='stretch')
         st.caption(t('Prices and availability come from the supplied store snapshot. Responses follow your selected language; English is the evaluation default.'))
     else:
         st.subheader(t('Your conversation with Mel'))
@@ -253,10 +254,10 @@ def run_app():
     if 'records' not in st.session_state:
         st.session_state.records = []
     with st.sidebar:
-        st.selectbox('Language / Idioma', list(LANGUAGES), format_func=LANGUAGES.get, key='language', on_change=reset_catalog_page)
-        st.caption(t('Language changes apply to new replies. Existing messages are kept.'))
         st.markdown('<div class="brand"><div class="brand-mark">m</div><div><div class="brand-name">Mel</div>'
                     '<div class="brand-caption">EMPÓRIO DA MÚSICA</div></div></div>', unsafe_allow_html=True)
+        st.selectbox('Language / Idioma', list(LANGUAGES), format_func=LANGUAGES.get, key='language', on_change=reset_catalog_page)
+        st.caption(t('Language changes apply to new replies. Existing messages are kept.'))
         view = st.radio(t('Workspace'), ['Chat', 'Catalog', 'Store guide'], format_func=partial(translate, language=st.session_state.language), key='workspace', label_visibility='collapsed', on_change=reset_catalog_page)
         st.divider()
         mode_label = st.radio(t('Response mode'), ['Offline mock', 'Groq · real model'], format_func=partial(translate, language=st.session_state.language), key='response_mode',
@@ -281,10 +282,12 @@ def run_app():
             st.caption(t('Session-only history. The model sees the latest eight exchanges; the screen keeps up to 40 turns. Reloading or starting a new conversation clears the session.'))
             st.caption(t('The store and data are fictional. A demo customer ID is a server-side fixture, not production authentication. Keep a Groq account on its Free plan to use the free quota.'))
             st.link_button(t('View project on GitHub'), 'https://github.com/flaviagaia/emporio-musica-ai-agent')
+    st.markdown(f'<div class="case-header"><div class="case-wordmark">ARTEFACT<span> /</span></div>'
+                f'<div class="case-label">{t("Candidate prototype")}<br>DATA &amp; AI · FLÁVIA GAIA</div></div>', unsafe_allow_html=True)
     if view == 'Chat':
         render_chat(mode, settings, show_sources, technical)
     elif view == 'Catalog':
         render_catalog()
     else:
         render_guide()
-    st.markdown(f'<div class="app-footer">Empório da Música · {t("Your music starts here.")} &nbsp; | &nbsp; {t("Artefact AI Engineer case")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="app-footer">Empório da Música · {t("Your music starts here.")} &nbsp; | &nbsp; {t("Candidate prototype · Artefact case")}</div>', unsafe_allow_html=True)

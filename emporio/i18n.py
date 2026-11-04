@@ -3,6 +3,8 @@ from decimal import Decimal
 
 LANGUAGES = {'en': 'English', 'pt': 'Português'}
 PT = {
+    'Candidate prototype': 'Protótipo do processo seletivo',
+    'Candidate prototype · Artefact case': 'Protótipo do processo seletivo · Case Artefact',
     'Workspace': 'Navegação', 'Chat': 'Conversa', 'Catalog': 'Catálogo', 'Store guide': 'Guia da loja',
     'Response mode': 'Modo de resposta', 'Offline mock': 'Mock offline', 'Groq · real model': 'Groq · modelo real',
     'Scripted demo. No API calls.': 'Demonstração simulada. Sem chamadas à API.',
