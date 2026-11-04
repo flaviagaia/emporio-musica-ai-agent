@@ -276,12 +276,12 @@ def run_app():
             st.caption(t('This is a demonstration with fictional store data. Confirm prices, availability and order details with the store.'))
             st.caption(t('Your conversation is kept only while this page stays open.'))
             st.link_button(t('View project on GitHub'), 'https://github.com/flaviagaia/emporio-musica-ai-agent')
-    st.markdown(f'<div class="case-header"><div class="case-wordmark">ARTEFACT<span> /</span></div>'
-                f'<div class="case-label">{t("Candidate prototype")}<br>DATA &amp; AI · FLÁVIA GAIA</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="case-header"><div class="case-wordmark">MEL<span> /</span></div>'
+                f'<div class="case-label">{t("Your music assistant")}<br>EMPÓRIO DA MÚSICA</div></div>', unsafe_allow_html=True)
     if view == 'Chat':
         render_chat(mode, settings, show_sources, technical)
     elif view == 'Catalog':
         render_catalog()
     else:
         render_guide()
-    st.markdown(f'<div class="app-footer">Empório da Música · {t("Your music starts here.")} &nbsp; | &nbsp; {t("Candidate prototype · Artefact case")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="app-footer">Empório da Música · {t("Your music starts here.")} &nbsp; | &nbsp; {t("Created by Flávia Gaia")}</div>', unsafe_allow_html=True)

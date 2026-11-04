@@ -30,7 +30,7 @@ def test_selected_language_changes_system_prompt_without_losing_context():
     agent.reply('Segunda pergunta')
     messages = backend.requests[-1]['messages']
     assert 'Respond in Brazilian Portuguese' in messages[0]['content']
-    assert 'Speak in English for this evaluation.' not in messages[0]['content']
+    assert 'Respond in English.' not in messages[0]['content']
     assert messages[1]['content'] == 'First question'
     assert agent.reply('') == 'Envie uma mensagem com 1 a 4.000 caracteres.'
 

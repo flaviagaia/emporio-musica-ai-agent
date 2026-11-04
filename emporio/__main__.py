@@ -5,7 +5,7 @@ from .store import DATA
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Mel - Empório da Música (English evaluation mode)')
+    parser = argparse.ArgumentParser(description='Mel - Empório da Música')
     parser.add_argument('--mode', choices=['mock', 'groq'], default='mock', help='Default: offline mock; Groq is opt-in')
     parser.add_argument('--demo-customer-id', type=int, help='Local evaluator fixture ONLY; not real authentication')
     parser.add_argument('--trace', action='store_true', help='Print tool names only; no customer data')

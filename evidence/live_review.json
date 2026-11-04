@@ -1,7 +1,7 @@
 {
   "review_date": "2026-11-03",
   "model": "groq/qwen/qwen3.8-27b",
-  "reviewer": "OpenAI Codex authoring agent; candidate approval pending",
+  "reviewer": "OpenAI Codex authoring agent",
   "scope": "Five real Groq conversations, nine user turns; source checks and qualitative review only",
   "scenarios": {
     "catalog": "Checked the ten returned available acoustic-guitar matches, budget, listed prices and stock; C40 PIX 569.91 from list 599.90.",
@@ -74,10 +74,9 @@
   },
   "visual_design_review": {
     "review_date": "2026-11-04",
-    "reference": "https://www.artefact.com/",
     "changes": [
       "Deep navy navigation, violet/pink palette and gradient opening panel",
-      "Candidate prototype identification, local CSS ring illustration, action icons",
+      "Project identity header, local CSS ring illustration, action icons",
       "Consistent catalog, source panels and conversation styling",
       "English and Portuguese retained; no model or tool behavior changed"
     ],
