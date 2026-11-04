@@ -1,7 +1,7 @@
 import argparse
 from .agent import Agent
 from .backend import LiteLLMBackend, ConfigurationError
-from .store import DATA
+from .paths import CONFIG_DIR
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
     parser.add_argument('--trace', action='store_true', help='Print tool names only; no customer data')
     args = parser.parse_args()
     from dotenv import load_dotenv
-    load_dotenv(DATA.parent / '.env', override=False)
+    load_dotenv(CONFIG_DIR / '.env', override=False)
     try:
         backend = LiteLLMBackend(mode=args.mode)
     except ConfigurationError as error:

@@ -5,8 +5,28 @@ import re
 import unicodedata
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
+from difflib import get_close_matches
+from .paths import DATA
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+CATEGORY_ALIASES = {
+    'electric guitars': 'guitarras', 'electric guitar': 'guitarras',
+    'bass guitars': 'baixos', 'bass guitar': 'baixos',
+    'acoustic guitars': 'violoes', 'acoustic guitar': 'violoes',
+    'classical guitars': 'violoes', 'classical guitar': 'violoes',
+    'drums and percussion': 'baterias', 'drums': 'baterias', 'drum': 'baterias',
+    'keyboards': 'teclados', 'keyboard': 'teclados', 'pianos': 'teclados', 'piano': 'teclados',
+    'guitars': 'guitarras', 'guitar': 'guitarras', 'bass': 'baixos',
+    'acoustic': 'violoes', 'violao': 'violoes', 'ukulele': 'ukuleles',
+    'beginner': 'iniciante', 'beginners': 'iniciante',
+}
+
+
+def search_tokens(query):
+    query = normalize(query)
+    for phrase, replacement in CATEGORY_ALIASES.items():
+        query = re.sub(r'\b' + re.escape(phrase) + r'\b', replacement, query)
+    stop = set('instrument instruments instrumento instrumentos product products available options for to a an the de do da para com um uma e'.split())
+    return [t for t in re.findall(r'[a-z0-9]+', query) if t not in stop]
 
 
 def normalize(value):
@@ -34,18 +54,20 @@ class Store:
             raise ValueError('catalog flags must be boolean')
         categories = {r['category_id']: r['name'] for r in self.rows('categories')}
         promotions = self.rows('promotions')
-        aliases = {'violao': 'violoes', 'guitar': 'guitarras', 'guitars': 'guitarras', 'acoustic': 'violoes', 'bass': 'baixos', 'keyboard': 'teclados', 'ukulele': 'ukuleles'}
-        normalized_query = normalize(query)
-        for phrase in ('acoustic guitars', 'acoustic guitar', 'classical guitars', 'classical guitar'):
-            normalized_query = normalized_query.replace(phrase, 'violoes')
-        generic_terms = {'instrument', 'instruments', 'instrumento', 'instrumentos', 'product', 'products', 'available', 'options'}
-        tokens = [aliases.get(t, t) for t in re.findall(r'[a-z0-9]+', normalized_query) if t not in generic_terms]
+        tokens = search_tokens(query)
+        model_comparison = len(tokens) > 1 and all(re.fullmatch(r'[a-z]+\d+[a-z0-9-]*', t) for t in tokens)
         results = []
         if max_price is not None and (not Decimal(str(max_price)).is_finite() or Decimal(str(max_price)) < 0):
             raise ValueError('max_price must be a finite nonnegative number')
         for row in self.rows('products'):
-            searchable = normalize(row['name'] + ' ' + categories.get(row['category_id'], ''))
-            if not all(t in searchable or (t == 'violoes' and 'violao' in searchable) for t in tokens):
+            searchable = normalize(' '.join([row['name'], categories.get(row['category_id'], ''), row['description'], row['specs']]))
+            words = re.findall(r'[a-z0-9]+', searchable)
+            if model_comparison:
+                if not any(re.search(r'\b' + re.escape(t) + r'\b', normalize(row['name'])) for t in tokens):
+                    continue
+            elif not all(t in searchable or (t == 'violoes' and 'violao' in searchable)
+                       or (len(t) >= 5 and not any(c.isdigit() for c in t)
+                           and get_close_matches(t, words, n=1, cutoff=.88)) for t in tokens):
                 continue
             stock = int(row['stock_quantity'])
             available = row['status'] == 'active' and stock > 0

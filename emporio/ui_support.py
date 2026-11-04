@@ -6,6 +6,7 @@ import os
 from dotenv import dotenv_values
 from .backend import DEFAULT_MODEL
 from .store import DATA
+from .paths import CONFIG_DIR
 from .i18n import translate, LANGUAGES
 
 CATEGORY_LABELS = {
@@ -22,7 +23,7 @@ class Settings:
     demo_customer_id: int | None = None
 
 
-def load_settings(secrets=None, env=None, path=DATA.parent / '.env'):
+def load_settings(secrets=None, env=None, path=CONFIG_DIR / '.env'):
     """Read server configuration without changing process-wide environment variables."""
     env = os.environ if env is None else env
     secrets = secrets or {}

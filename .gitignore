@@ -9,3 +9,8 @@ __pycache__/
 live_examples/
 mock_examples/
 .streamlit/secrets.toml
+
+build/
+dist/
+.coverage
+htmlcov/

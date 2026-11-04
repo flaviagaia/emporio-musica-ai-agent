@@ -5,22 +5,27 @@ import html
 import math
 from pathlib import Path
 import time
+from dataclasses import asdict
 import streamlit as st
 from .agent import Agent
 from .backend import LiteLLMBackend, ConfigurationError
 from .policies import Policies
+from .validation import validate_data, DataValidationError
 from .store import Store, DATA
 from .ui_support import CATEGORY_LABELS, load_settings, transcript
 from .presentation import chat_markdown
 from .i18n import translate, format_money, LANGUAGES
 
 MAX_VISIBLE_TURNS = 40
+PERSISTED_WIDGETS = ('catalog_query', 'catalog_category', 'catalog_budget', 'catalog_available',
+                     'catalog_promotion', 'catalog_offset', 'guide_query', 'show_sources')
 SUGGESTIONS = [
     ('Find an acoustic guitar', 'Which acoustic instruments are available for up to BRL 1000?'),
     ('Check a price', 'What is the PIX price of the Yamaha C40?'),
     ('See active offers', 'Show one instrument with an active promotion and explain whether PIX adds a discount.'),
     ('Ask about returns', 'I regret my purchase. Can I return my order?'),
 ]
+SPEC_LABELS = {'top': 'Top', 'back_sides': 'Back and sides', 'neck': 'Neck', 'strings': 'Strings', 'scale': 'Scale length', 'electronics': 'Electronics', 'color': 'Color', 'body': 'Body', 'pickups': 'Pickups', 'frets': 'Frets', 'keys': 'Keys', 'finish': 'Finish'}
 TOOL_NAMES = {'search_products': 'Product catalog', 'search_policies': 'Store policy', 'get_order': 'Order lookup'}
 
 
@@ -40,6 +45,17 @@ def clear_conversation():
     for key in ('agent', 'agent_signature', 'pending_question'):
         st.session_state.pop(key, None)
     st.session_state.records = []
+
+
+def switch_mode():
+    previous = st.session_state.get('active_mode', 'Offline mock')
+    saved = st.session_state.setdefault('mode_conversations', {})
+    saved[previous] = {key: st.session_state[key] for key in ('records', 'agent', 'agent_signature') if key in st.session_state}
+    for key in ('records', 'agent', 'agent_signature', 'pending_question'):
+        st.session_state.pop(key, None)
+    current = st.session_state.response_mode
+    st.session_state.update(saved.get(current, {'records': []}))
+    st.session_state.active_mode = current
 
 
 def queue_question(question):
@@ -69,7 +85,7 @@ def configured_settings():
 
 def create_agent(mode, settings):
     return Agent(LiteLLMBackend(mode=mode, model=settings.model, api_key=settings.api_key),
-                 trusted_customer_id=settings.demo_customer_id, inline_sources=False)
+                 trusted_customer_id=None, inline_sources=False)
 
 
 def sources(trace, technical=False):
@@ -151,6 +167,8 @@ def render_chat(mode, settings, show_sources, technical):
         answer = agent.reply(question)
     record = {'question': question, 'answer': answer, 'trace': agent.last_trace.copy(),
               'error': agent.last_error, 'language': agent.language, 'elapsed': time.monotonic() - started}
+    if getattr(agent, 'last_reply', None):
+        record['payload'] = asdict(agent.last_reply)
     st.session_state.records = (st.session_state.records + [record])[-MAX_VISIBLE_TURNS:]
     render_answer(record, show_sources, technical)
     # A rerun displays the updated download and transcript controls without resending the request.
@@ -167,7 +185,7 @@ def render_answer(record, show_sources, technical):
     with st.chat_message('assistant', avatar=':material/music_note:'):
         # Currency symbols must remain literal instead of opening Markdown math.
         if record['error']:
-            st.warning(t('Mel could not complete your request. Please try again in a moment.'))
+            st.warning(t('The conversation limit has been reached. Please try again later.') if record['error'] == 'rate_limit' else t('Mel could not complete your request. Please try again in a moment.'))
         else:
             st.markdown(chat_markdown(record['answer']))
         if show_sources and not record['error']:
@@ -179,7 +197,7 @@ def render_catalog():
                 f'<div class="hero-copy">{t("Find your instrument and compare prices and availability.")}</div>', unsafe_allow_html=True)
     store = Store()
     categories = store.rows('categories')
-    category_options = {'All instruments': ''} | {CATEGORY_LABELS[r['category_id']]: r['name'] for r in categories}
+    category_options = {'All instruments': ''} | {CATEGORY_LABELS.get(r['category_id'], r['name']): r['name'] for r in categories}
     filters = st.columns([2, 1.4, 1.4])
     query = filters[0].text_input(t('Search instruments'), placeholder='Yamaha, Takamine, ukulele…', key='catalog_query', on_change=reset_catalog_page)
     category = filters[1].selectbox(t('Category'), list(category_options), format_func=partial(translate, language=st.session_state.language), key='catalog_category', on_change=reset_catalog_page)
@@ -201,7 +219,7 @@ def render_catalog():
         columns = st.columns(2)
         for column, product in zip(columns, result['products'][start:start + 2]):
             with column.container(border=True):
-                category_label = next((CATEGORY_LABELS[r['category_id']] for r in categories if r['name'] == product['category']), product['category'])
+                category_label = next((CATEGORY_LABELS.get(r['category_id'], r['name']) for r in categories if r['name'] == product['category']), product['category'])
                 st.markdown(f'<div class="product-category">{html.escape(t(category_label))}</div>'
                             f'<div class="product-name">{html.escape(product["name"])}</div>'
                             f'<div class="product-price">R$ {html.escape(money(product["price_brl"]))}</div>', unsafe_allow_html=True)
@@ -211,7 +229,8 @@ def render_catalog():
                 st.caption(t("PIX R$ {price} · {stock} in stock").format(price=money(product["pix_price_brl"]), stock=product["stock_quantity"]) if product["available"] else t("Unavailable · {status}").format(status=t(product["status"])))
                 with st.expander(t('Instrument details')):
                     st.write(product['description'])
-                    st.json(product['specs'])
+                    for key, value in product['specs'].items():
+                        st.write(f"**{t(SPEC_LABELS.get(key, key.replace('_', ' ').capitalize()))}:** {t(str(value))}")
                 st.button(t('Ask Mel about this instrument'), key=f'ask_product_{product["product_id"]}',
                           on_click=queue_question, args=(t('What is the price and availability of {name}?').format(name=product['name']),), width='stretch')
     controls = st.columns([1, 2, 1])
@@ -248,10 +267,24 @@ def render_guide():
                        file_name='Emporio da Musica - Store policies.pdf', mime='application/pdf')
 
 
+@st.cache_data(show_spinner=False)
+def validated_reference(signature):
+    return validate_data(DATA)
+
+
 def run_app():
     st.set_page_config(page_title='Mel | Empório da Música', page_icon=':material/music_note:', layout='wide')
     st.markdown(Path(__file__).with_name('ui.css').read_text(), unsafe_allow_html=True)
+    try:
+        signature = tuple((p.name, p.stat().st_mtime_ns, p.stat().st_size) for p in sorted(DATA.iterdir()) if p.suffix in ('.csv', '.pdf'))
+        validated_reference(signature)
+    except (DataValidationError, OSError, ValueError):
+        st.error(t('Store information is temporarily unavailable. Please try again later.'))
+        st.stop()
     settings = configured_settings()
+    for key, value in st.session_state.get('saved_filters', {}).items():
+        if key not in st.session_state:
+            st.session_state[key] = value
     if 'records' not in st.session_state:
         st.session_state.records = []
     with st.sidebar:
@@ -259,10 +292,10 @@ def run_app():
                     '<div class="brand-caption">EMPÓRIO DA MÚSICA</div></div></div>', unsafe_allow_html=True)
         st.selectbox('Language / Idioma', list(LANGUAGES), format_func=LANGUAGES.get, key='language', on_change=reset_catalog_page)
         st.caption(t('Language changes apply to new replies. Existing messages are kept.'))
-        view = st.radio(t('Workspace'), ['Chat', 'Catalog', 'Store guide'], format_func=partial(translate, language=st.session_state.language), key='workspace', label_visibility='collapsed', on_change=reset_catalog_page)
+        view = st.radio(t('Workspace'), ['Chat', 'Catalog', 'Store guide'], format_func=partial(translate, language=st.session_state.language), key='workspace', label_visibility='collapsed')
         st.divider()
         mode_label = st.radio(t('Response mode'), ['Offline mock', 'Groq · real model'], format_func=partial(mode_name, language=st.session_state.language), key='response_mode',
-                              captions=[t('Try example questions.'), t('Ask your own questions.')], on_change=clear_conversation)
+                              captions=[t('Try example questions.'), t('Ask your own questions.')], on_change=switch_mode)
         mode = 'mock' if mode_label == 'Offline mock' else 'groq'
         if mode == 'groq' and not settings.api_key:
             st.warning(t('Chat is temporarily unavailable. You can use the guided demo.'))
@@ -285,4 +318,6 @@ def run_app():
         render_catalog()
     else:
         render_guide()
+    saved = st.session_state.setdefault('saved_filters', {})
+    saved.update({key: st.session_state[key] for key in PERSISTED_WIDGETS if key in st.session_state})
     st.markdown(f'<div class="app-footer">Empório da Música · {t("Your music starts here.")} &nbsp; | &nbsp; {t("Created by Flávia Gaia")}</div>', unsafe_allow_html=True)

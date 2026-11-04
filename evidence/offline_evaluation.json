@@ -1,0 +1,178 @@
+{
+  "mode": "offline mock only; not a real-model accuracy score",
+  "checked_at_utc": "2026-11-04T13:47:56.516658+00:00",
+  "data_version": "6802f5eef66b93221065b0a6345792a046132f868baac6a42a68d7401797754d",
+  "passed": 16,
+  "total": 16,
+  "scenarios": [
+    {
+      "id": "price-pt",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "price-en",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "keyboard-budget-pt",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true,
+        "category": true,
+        "budget": true
+      }
+    },
+    {
+      "id": "keyboard-budget-en",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true,
+        "category": true,
+        "budget": true
+      }
+    },
+    {
+      "id": "keyboard-matches",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true,
+        "category": true,
+        "budget": true
+      }
+    },
+    {
+      "id": "electric-en",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true,
+        "category": true
+      }
+    },
+    {
+      "id": "bass-en",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true,
+        "category": true
+      }
+    },
+    {
+      "id": "drums-en",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true,
+        "category": true
+      }
+    },
+    {
+      "id": "model-followup",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "model-comparison",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "defect-pt",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "withdrawal-followup",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "address-pt",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "privacy-pt",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "order-guest",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    },
+    {
+      "id": "scope-en",
+      "passed": true,
+      "checks": {
+        "completed": true,
+        "expected_text": true,
+        "excluded_text": true,
+        "tool": true
+      }
+    }
+  ]
+}

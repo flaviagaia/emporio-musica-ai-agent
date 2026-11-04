@@ -1,12 +1,15 @@
 """Bounded LLM function-calling loop. No arbitrary SQL, writes or code execution."""
 import json
 import math
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from .store import Store, normalize
 from .policies import Policies
 from .backend import IncompleteResponseError
 from .i18n import translate
+from .routing import interpret
+from .presentation import Reply, product_reply, order_reply
 
 PROMPT = """You are Mel, the friendly, practical customer-service assistant for Empório da Música,
 a musical-instrument shop in Campo Grande, Brazil. Respond in English.
@@ -75,6 +78,11 @@ class Agent:
         self.history = []
         self.last_trace = []
         self.last_error = None
+        self.last_reply = Reply('')
+
+    def finish(self, answer, *, products=None):
+        self.last_reply = Reply(answer, products or [], self.last_trace.copy(), self.last_error)
+        return answer
 
     def execute(self, name, args):
         if not isinstance(args, dict):
@@ -106,9 +114,10 @@ class Agent:
     def reply(self, message):
         self.last_trace = []
         self.last_error = None
+        self.last_reply = Reply('')
         if not message.strip() or len(message) > 4000:
             self.last_error = 'invalid_message'
-            return translate('Please send a message between 1 and 4,000 characters.', self.language)
+            return self.finish(translate('Please send a message between 1 and 4,000 characters.', self.language))
         pending = self.history + [{'role': 'user', 'content': message}]
         now = datetime.now(ZoneInfo('America/Campo_Grande')).isoformat()
         output_language = 'Brazilian Portuguese' if self.language == 'pt' else 'English'
@@ -118,20 +127,51 @@ class Agent:
             prompt += '\nWrite natural customer-facing prose. Use short paragraphs. For prices, put the instrument name first, then price and PIX price on separate lines. Omit zero discounts and repeated list prices. Avoid dense parentheses, tables, technical notes and unnecessary bullet points. Use ordinary text and bold only; no LaTeX or math delimiters.\n[CHAT_PRESENTATION]'
         messages = [{'role': 'system', 'content': prompt + f'\n[OUTPUT_LANGUAGE:{self.language}]\nCurrent local time: ' + now}] + pending
         try:
-            context = normalize(message + ' ' + ' '.join(m['content'] for m in self.history[-4:] if m['role'] == 'user'))
-            policy_followup = any(term in context for term in ('return', 'refund', 'regret', 'received', 'unused', 'online', 'devolver', 'arrependimento'))
+            request = interpret(message, self.history)
+            products = []
             for step in range(6):
                 response = self.backend.complete(messages=messages, tools=TOOLS,
-                    tool_choice='required' if policy_followup and step == 0 else 'auto')
+                    tool_choice='required' if request.tool and step == 0 else 'auto')
                 calls = response.get('tool_calls') or []
                 if not calls:
                     answer = (response.get('content') or '').strip()
                     if not answer:
                         self.last_error = 'empty_response'
-                        return translate('I could not produce a reliable answer. Please contact the store team.', self.language)
+                        return self.finish(translate('I could not produce a reliable answer. Please contact the store team.', self.language))
+                    expected_tool = request.tool
+                    if not expected_tool and re.search(r'(?:R\$|BRL|\$)\s*\d', answer):
+                        expected_tool = 'search_products'
+                    expected = [t for t in self.last_trace if t['tool'] == expected_tool]
+                    # No commercial answer can bypass the expected business lookup.
+                    clarification = request.kind == 'catalog' and not request.query and not request.promotion and not self.last_trace and not any(c.isdigit() for c in answer)
+                    if clarification:
+                        answer = 'Qual instrumento ou modelo você procura?' if self.language == 'pt' else 'Which instrument or model are you looking for?'
+                    if expected_tool and not expected and not clarification:
+                        self.last_error = 'unverified_answer'
+                        return self.finish(translate('I could not verify that information. Please clarify your question or contact the store.', self.language))
+                    if expected:
+                        successful = [t for t in expected if not t['result'].get('error')]
+                        if not successful:
+                            error = expected[-1]['result']
+                            # Authentication refusals are normal business outcomes.
+                            if error.get('error') not in ('authentication_required', 'not_found'):
+                                self.last_error = 'data_unavailable'
+                            return self.finish(translate(error.get('message', 'Unable to retrieve reliable data. Refer to the team.'), self.language))
+                        if expected_tool == 'search_products':
+                            # Ignore model-authored amounts: render only retrieved facts.
+                            unique = {p['product_id']: p for t in successful for p in t['result'].get('products', [])}
+                            products = list(unique.values())
+                            answer = product_reply(products, self.language) if products else translate('No instruments match these filters. Would you like to adjust the search?', self.language)
+                            if self.inline_sources:
+                                answer += '\n\nFonte: catálogo da loja.' if self.language == 'pt' else '\n\nSource: store catalog.'
+                        elif request.kind == 'order':
+                            answer = order_reply(successful[-1]['result'], self.language)
+                        elif not any(t['result'].get('matches') for t in successful):
+                            self.last_error = 'data_unavailable'
+                            return self.finish(translate('I could not verify that information. Please clarify your question or contact the store.', self.language))
                     self.history = (self.history + [{'role': 'user', 'content': message},
                                      {'role': 'assistant', 'content': answer}])[-16:]
-                    return answer
+                    return self.finish(answer, products=products)
                 if len(calls) > 4:
                     break
                 # Send only documented chat fields back to the provider.
@@ -140,6 +180,20 @@ class Agent:
                     name = call['function']['name']
                     try:
                         args = json.loads(call['function']['arguments'])
+                        if isinstance(args, dict) and name == 'search_products' and request.kind == 'catalog':
+                            # Enforce the customer's recognized filters even if the
+                            # model sends a different category or drops the budget.
+                            if request.query:
+                                args['query'] = request.query
+                            if request.specific:
+                                args['available_only'] = False
+                            if request.budget is not None:
+                                proposed = args.get('max_price')
+                                args['max_price'] = min(proposed, request.budget) if type(proposed) in (int, float) and math.isfinite(proposed) and proposed >= 0 else request.budget
+                            if request.promotion:
+                                args['promotion_only'] = True
+                        if isinstance(args, dict) and name == 'search_policies' and request.kind == 'policy':
+                            args['query'] = request.query
                         result = self.execute(name, args) if isinstance(args, dict) else {'error': 'invalid_arguments'}
                     except (json.JSONDecodeError, TypeError):
                         args, result = {}, {'error': 'invalid_arguments'}
@@ -147,13 +201,13 @@ class Agent:
                     messages.append({'role': 'tool', 'tool_call_id': call['id'],
                                      'content': json.dumps(result, ensure_ascii=False)})
             self.last_error = 'lookup_limit'
-            return translate('This request needs help from the store team; I reached my lookup limit.', self.language)
+            return self.finish(translate('This request needs help from the store team; I reached my lookup limit.', self.language))
         except IncompleteResponseError:
             self.last_error = 'incomplete_response'
-            return translate('The model response was incomplete. Please try a shorter question or contact the store team.', self.language)
+            return self.finish(translate('The model response was incomplete. Please try a shorter question or contact the store team.', self.language))
         except Exception as error:
             # Retain a non-sensitive category for CLI/capture; never raw provider errors.
             self.last_error = 'rate_limit' if getattr(error, 'status_code', None) == 429 else 'provider_failure'
             if self.last_error == 'rate_limit':
-                return translate('The free API request limit has been reached. Please try again later. No fallback provider was called.', self.language)
-            return translate('The assistant service is unavailable. Please try again or contact the store team.', self.language)
+                return self.finish(translate('The free API request limit has been reached. Please try again later. No fallback provider was called.', self.language))
+            return self.finish(translate('The assistant service is unavailable. Please try again or contact the store team.', self.language))

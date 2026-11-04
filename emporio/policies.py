@@ -3,9 +3,10 @@ import re
 from collections import Counter
 from .store import DATA, normalize
 
-STOP = set('the a an is of to and do you i my can what how da de do e o a os as um uma qual que eu meu minha para com na no em'.split())
+STOP = set('the a an is of to and do you i my can what how da de do e o a os as um uma qual que eu meu minha para com na no em voces oferecem musica store loja'.split())
 SYNONYMS = {
  'return': 'devolucao arrependimento troca', 'refund': 'reembolso devolucao',
+ 'defective': 'defeito garantia',
  'exchange': 'troca', 'warranty': 'garantia defeito', 'defect': 'defeito garantia',
  'hours': 'horario funcionamento', 'open': 'horario funcionamento',
  'address': 'endereco', 'shipping': 'frete entrega', 'delivery': 'frete entrega',
@@ -47,7 +48,11 @@ class Policies:
         for page, text in self.pages:
             counts = Counter(tokens(text))
             score = sum(min(counts[t], 3) for t in expanded)
-            if score:
+            hits = sum(bool(counts[t]) for t in set(terms))
+            relevant = hits >= (2 if len(set(terms)) > 2 else 1)
+            # English synonyms are legitimate evidence even without literal overlap.
+            relevant = relevant or any(t in SYNONYMS and any(counts[s] for s in tokens(SYNONYMS[t])) for t in terms)
+            if score and relevant:
                 ranked.append((score, page, text))
         ranked.sort(key=lambda x: (-x[0], x[1]))
         return {'source': 'store_policies.pdf, version 2.1 (June 2025)',

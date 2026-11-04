@@ -13,7 +13,7 @@ def main():
         'catalog': {'budget_search': store.products('violão', 1000),
                     'follow_up': store.products('Yamaha C40')},
         'address': policies.search('store address endereco'),
-        'promotion': {'products': [p for p in store.products()['products'] if float(p['discount_percent']) > 0],
+        'promotion': {'products': [p for p in store.products(promotion_only=True)['products'] if float(p['discount_percent']) > 0],
                       'policy': policies.search('PIX promocao cumulatividade')},
         'returns': policies.search('online return refund devolucao arrependimento'),
         'boundaries': {'anonymous_order': store.order(1), 'wrong_customer': store.order(1, 7),

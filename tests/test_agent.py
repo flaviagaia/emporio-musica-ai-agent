@@ -38,7 +38,7 @@ def test_selected_language_changes_system_prompt_without_losing_context():
 def test_tool_loop_provides_actual_source_to_model():
     backend = ScriptedBackend([call(), response('Grounded answer fixture')])
     agent = Agent(backend)
-    assert agent.reply('What does the C40 cost?') == 'Grounded answer fixture'
+    assert '599.90' in agent.reply('What does the C40 cost?')
     output = backend.requests[1]['messages'][-1]
     assert '599.90' in output['content']
     assert output['role'] == 'tool' and output['tool_call_id'] == 'c1'

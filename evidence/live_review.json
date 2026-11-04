@@ -103,5 +103,28 @@
       "Single model line breaks render as visible breaks instead of collapsing into one sentence."
     ],
     "browser_checks": "Portuguese price question verified in guided mode and with the real Groq model; correct C40 price 599.90 and PIX 569.91, no inline source label."
+  },
+  "reliability_improvements": {
+    "review_date": "2026-11-04",
+    "automated_tests": 82,
+    "offline_scenarios": 16,
+    "data_version_sha256": "6802f5eef66b93221065b0a6345792a046132f868baac6a42a68d7401797754d",
+    "changes": [
+      "Shared bilingual request routing, comparisons and compact model follow-ups.",
+      "Recognized business requests require the appropriate lookup; product amounts and stock are rendered from verified results.",
+      "Recognized category, budget and policy intent constrain model tool arguments.",
+      "Filters survive navigation, mode histories are separate, specification labels replace JSON.",
+      "Reference data validates and ships in installed distributions; external-directory smoke test passed with 65 products and 16 offline scenarios.",
+      "Shared process-local Groq caps and metadata-only usage logging.",
+      "GitHub Actions matrix validates data, tests, offline scenarios and installed distributions."
+    ],
+    "live_browser_checks": [
+      "English keyboard lookup under BRL 2000 using the real Groq model returned Korg Synth 1 Pro at BRL 1127.00, PIX 1070.65, two units; checked against source."
+    ],
+    "limitations": [
+      "Offline score is not real-model accuracy.",
+      "Policy interpretation and unrecognized natural-language paraphrases still need broader evaluation.",
+      "Request limits are in-process and reset on restart; no public deployment or production authentication is claimed."
+    ]
   }
 }

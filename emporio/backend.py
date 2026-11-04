@@ -1,5 +1,7 @@
 """LiteLLM SDK boundary. Mock is explicit, offline and never falls back to Groq."""
 import os
+import logging
+from .limits import SHARED_LIMITER
 
 DEFAULT_MODEL = 'groq/qwen/qwen3.8-27b'
 
@@ -13,10 +15,12 @@ class ConfigurationError(ValueError):
 
 
 class LiteLLMBackend:
-    def __init__(self, mode='mock', model=None, api_key=None):
+    def __init__(self, mode='mock', model=None, api_key=None, limiter=None):
         if mode not in ('mock', 'groq'):
             raise ConfigurationError('Mode must be mock or groq.')
         self.mode = mode
+        self.limiter = limiter if limiter is not None else SHARED_LIMITER
+        self.last_usage = {}
         self.model = model or os.getenv('GROQ_MODEL', DEFAULT_MODEL)
         if not self.model.startswith('groq/'):
             raise ConfigurationError('This project only permits groq/ models; paid-provider fallback is disabled.')
@@ -25,6 +29,8 @@ class LiteLLMBackend:
             raise ConfigurationError('GROQ_API_KEY is missing. Run python -m emporio.configure locally, or use --mode mock.')
 
     def complete(self, messages, tools, tool_choice='auto'):
+        if self.mode == 'groq':
+            self.limiter.acquire(self.api_key)
         # Avoid LiteLLM downloading the model-cost catalog even in mock mode.
         os.environ['LITELLM_LOCAL_MODEL_COST_MAP'] = 'True'
         from litellm import completion
@@ -40,6 +46,9 @@ class LiteLLMBackend:
             options['api_key'] = self.api_key
         # SDK only; no proxy, router, automatic retries, cache or paid fallback.
         result = completion(**options)
+        usage = getattr(result, 'usage', None)
+        self.last_usage = {key: int(getattr(usage, key, 0) or 0) for key in ('prompt_tokens', 'completion_tokens', 'total_tokens')}
+        logging.getLogger('emporio').info('Model request completed: mode=%s tokens=%s', self.mode, self.last_usage['total_tokens'])
         choice = result.choices[0]
         if choice.finish_reason not in ('stop', 'tool_calls'):
             raise IncompleteResponseError('The model did not complete its response.')

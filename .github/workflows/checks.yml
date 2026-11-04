@@ -1,0 +1,28 @@
+name: Project checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -e '.[dev]' build
+      - run: python -m emporio.validation
+      - run: python -m pytest -q
+      - run: python -m emporio.evaluate
+      - run: python -m build
+      - name: Verify installed distribution outside checkout
+        run: |
+          python -m venv /tmp/mel-installed
+          /tmp/mel-installed/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/mel-installed/bin/python -m emporio.validation
+          /tmp/mel-installed/bin/python -m emporio.evaluate

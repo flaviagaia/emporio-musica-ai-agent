@@ -3,6 +3,12 @@ from decimal import Decimal
 
 LANGUAGES = {'en': 'English', 'pt': 'Português'}
 PT = {
+    'Store information is temporarily unavailable. Please try again later.': 'As informações da loja estão indisponíveis no momento. Tente novamente mais tarde.',
+    'The conversation limit has been reached. Please try again later.': 'O limite de conversas foi atingido. Tente novamente mais tarde.',
+    'Top': 'Tampo', 'Back and sides': 'Fundo e laterais', 'Neck': 'Braço', 'Strings': 'Cordas', 'Scale length': 'Comprimento da escala', 'Electronics': 'Eletrônica', 'Color': 'Cor', 'Body': 'Corpo', 'Pickups': 'Captadores', 'Frets': 'Trastes', 'Keys': 'Teclas', 'Finish': 'Acabamento', 'no': 'Não', 'yes': 'Sim',
+
+    'I could not verify that information. Please clarify your question or contact the store.': 'Não consegui confirmar essa informação. Você pode detalhar a pergunta ou consultar a equipe da loja.',
+    'No instruments match these filters. Would you like to adjust the search?': 'Não encontrei instrumentos com esses filtros. Quer ajustar a busca?',
     'Guided demo': 'Demonstração guiada', 'Chat with Mel': 'Conversar com a Mel',
     'Try example questions.': 'Experimente perguntas de exemplo.',
     'Ask your own questions.': 'Faça suas próprias perguntas.',

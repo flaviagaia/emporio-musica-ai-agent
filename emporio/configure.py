@@ -1,12 +1,13 @@
 """Save a Groq key locally without displaying it or putting it in shell history."""
 import getpass
 import os
-from .store import DATA
+from .paths import CONFIG_DIR
 from .backend import DEFAULT_MODEL
 
 
 def main():
-    path = DATA.parent / '.env'
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = CONFIG_DIR / '.env'
     if path.exists():
         raise SystemExit('A local .env already exists. Edit it locally; it will not be overwritten.')
     key = getpass.getpass('Groq API key (hidden; saved only in local ignored .env): ').strip()

@@ -186,3 +186,39 @@ def test_customer_interface_hides_technical_diagnostics():
     assert 'source lookup(s)' not in captions
     assert 'API' not in captions and 'Groq' not in captions
     assert not at.exception
+
+
+def test_catalog_and_policy_filters_survive_navigation():
+    at = app()
+    at.radio(key='workspace').set_value('Catalog').run()
+    at.text_input(key='catalog_query').set_value('Yamaha').run()
+    at.number_input(key='catalog_budget').set_value(1000).run()
+    at.radio(key='workspace').set_value('Store guide').run()
+    at.text_input(key='guide_query').set_value('garantia').run()
+    at.radio(key='workspace').set_value('Catalog').run()
+    assert at.text_input(key='catalog_query').value == 'Yamaha'
+    assert at.number_input(key='catalog_budget').value == 1000
+    at.radio(key='workspace').set_value('Store guide').run()
+    assert at.text_input(key='guide_query').value == 'garantia'
+    assert not at.exception
+
+
+def test_mode_switch_restores_previous_conversation_without_repeating_calls():
+    at = app()
+    at.chat_input[0].set_value('Yamaha C40 price?').run()
+    original = at.session_state['agent']
+    history = original.history.copy()
+    at.radio(key='response_mode').set_value('Groq · real model').run()
+    assert at.session_state['records'] == []
+    at.radio(key='response_mode').set_value('Offline mock').run()
+    assert at.session_state['agent'] is original
+    assert len(at.session_state['records']) == 1
+    assert original.history == history
+    next(b for b in at.button if b.label == 'New conversation').click().run()
+    assert at.session_state['records'] == []
+
+
+def test_server_demo_identity_is_not_customer_authentication_in_ui():
+    agent = ui.create_agent('mock', Settings(demo_customer_id=3))
+    assert agent.trusted_customer_id is None
+    assert 'authenticated' in agent.reply('order 1')

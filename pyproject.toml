@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "emporio-assistant"
-version = "0.1.0"
+version = "0.2.0"
 description = "A bilingual music-store assistant with tool-grounded answers and a Streamlit interface"
 requires-python = ">=3.11"
 dependencies = ["litellm==1.80.0", "pydantic==2.12.5", "python-dotenv>=1,<2", "tzdata>=2025.2", "pymupdf>=1.24,<2"]
@@ -21,4 +21,4 @@ pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-emporio = ["ui.css"]
+emporio = ["ui.css", "data/*.csv", "data/*.pdf"]
