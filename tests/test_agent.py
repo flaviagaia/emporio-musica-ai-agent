@@ -22,6 +22,19 @@ def response(text):
     return {'role': 'assistant', 'content': text}
 
 
+def test_selected_language_changes_system_prompt_without_losing_context():
+    backend = ScriptedBackend([response('English fixture'), response('Resposta em português')])
+    agent = Agent(backend)
+    agent.reply('First question')
+    agent.language = 'pt'
+    agent.reply('Segunda pergunta')
+    messages = backend.requests[-1]['messages']
+    assert 'Respond in Brazilian Portuguese' in messages[0]['content']
+    assert 'Speak in English for this evaluation.' not in messages[0]['content']
+    assert messages[1]['content'] == 'First question'
+    assert agent.reply('') == 'Envie uma mensagem com 1 a 4.000 caracteres.'
+
+
 def test_tool_loop_provides_actual_source_to_model():
     backend = ScriptedBackend([call(), response('Grounded answer fixture')])
     agent = Agent(backend)

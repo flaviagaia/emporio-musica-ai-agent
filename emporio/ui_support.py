@@ -6,6 +6,7 @@ import os
 from dotenv import dotenv_values
 from .backend import DEFAULT_MODEL
 from .store import DATA
+from .i18n import translate, LANGUAGES
 
 CATEGORY_LABELS = {
     '1': 'Electric guitars', '2': 'Bass guitars', '3': 'Drums & percussion',
@@ -33,14 +34,17 @@ def load_settings(secrets=None, env=None, path=DATA.parent / '.env'):
     return Settings(read('GROQ_API_KEY'), read('GROQ_MODEL', DEFAULT_MODEL), customer_id)
 
 
-def transcript(records, mode, model):
-    lines = ['# Mel - Empório da Música', f'Mode: {mode}', f'Model setting: {model}',
-             f'Exported (UTC): {datetime.now(timezone.utc).isoformat()}',
-             'Offline mock is a scripted simulator, not a real model.' if mode == 'mock' else
-             'Real Groq model responses; source correctness still requires review.']
+def transcript(records, mode, model, language='en'):
+    t = lambda value: translate(value, language)
+    lines = ['# Mel - Empório da Música', f"{t('Mode')}: {mode}", f"{t('Model setting')}: {model}",
+             f"{t('Language')}: {LANGUAGES[language]}",
+             f"{t('Exported (UTC)')}: {datetime.now(timezone.utc).isoformat()}",
+             t('Offline mock is a scripted simulator, not a real model.') if mode == 'mock' else
+             t('Real Groq model responses; source correctness still requires review.')]
     for record in records:
-        lines.extend(['\n## You\n', record['question'], '\n## Mel\n', record['answer'],
-                      '\nSources: ' + ', '.join(sorted({t['tool'] for t in record['trace']}))])
+        lines.extend(['\n## ' + t('You') + '\n', record['question'], '\n## Mel\n', record['answer'],
+                      t('Reply language: {language}').format(language=LANGUAGES[record.get('language', 'en')]),
+                      '\n' + t('Sources') + ': ' + ', '.join(sorted({t(s['tool']) for s in record['trace']}))])
         if record['error']:
-            lines.append('Response status: ' + record['error'])
+            lines.append(t('Response status') + ': ' + record['error'])
     return '\n'.join(lines) + '\n'

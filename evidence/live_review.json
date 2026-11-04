@@ -56,5 +56,20 @@
       "Explicit API key is scoped per backend instance"
     ],
     "deployment": "Local Streamlit server bound to 127.0.0.1. No externally hosted deployment is claimed."
+  },
+  "bilingual_streamlit_review": {
+    "review_date": "2026-11-04",
+    "total_automated_tests": 46,
+    "languages": [
+      "English (default)",
+      "Português"
+    ],
+    "checks": [
+      "Language switch preserves existing messages and model history; new replies follow the selected language.",
+      "Portuguese catalog and policy navigation, mock prices, privacy refusals and conversation export checked with AppTest.",
+      "Real Groq browser turn in Portuguese returned Yamaha C40 list R$ 599,90, PIX R$ 569,91 and 12 units; verified against tool result.",
+      "Interface translation uses local strings and no translation API. Original source materials retain their source language."
+    ],
+    "screenshot": "docs/screenshots/portuguese.jpg"
   }
 }

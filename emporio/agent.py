@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from .store import Store, normalize
 from .policies import Policies
 from .backend import IncompleteResponseError
+from .i18n import translate
 
 PROMPT = """You are Mel, the friendly, practical customer-service assistant for Empório da Música,
 a musical-instrument shop in Campo Grande, Brazil. Speak in English for this evaluation.
@@ -62,7 +63,10 @@ TOOLS = [
 
 
 class Agent:
-    def __init__(self, backend, trusted_customer_id=None, store=None, policies=None):
+    def __init__(self, backend, trusted_customer_id=None, store=None, policies=None, language='en'):
+        if language not in ('en', 'pt'):
+            raise ValueError('Unsupported language')
+        self.language = language
         self.backend = backend
         self.model = getattr(backend, 'model', 'test-fixture')
         self.trusted_customer_id = trusted_customer_id
@@ -103,10 +107,12 @@ class Agent:
         self.last_error = None
         if not message.strip() or len(message) > 4000:
             self.last_error = 'invalid_message'
-            return 'Please send a message between 1 and 4,000 characters.'
+            return translate('Please send a message between 1 and 4,000 characters.', self.language)
         pending = self.history + [{'role': 'user', 'content': message}]
         now = datetime.now(ZoneInfo('America/Campo_Grande')).isoformat()
-        messages = [{'role': 'system', 'content': PROMPT + '\nCurrent local time: ' + now}] + pending
+        output_language = 'Brazilian Portuguese' if self.language == 'pt' else 'English'
+        prompt = PROMPT.replace('Speak in English for this evaluation.', f'Respond in {output_language} for this conversation.')
+        messages = [{'role': 'system', 'content': prompt + f'\n[OUTPUT_LANGUAGE:{self.language}]\nCurrent local time: ' + now}] + pending
         try:
             context = normalize(message + ' ' + ' '.join(m['content'] for m in self.history[-4:] if m['role'] == 'user'))
             policy_followup = any(term in context for term in ('return', 'refund', 'regret', 'received', 'unused', 'online', 'devolver', 'arrependimento'))
@@ -118,7 +124,7 @@ class Agent:
                     answer = (response.get('content') or '').strip()
                     if not answer:
                         self.last_error = 'empty_response'
-                        return 'I could not produce a reliable answer. Please contact the store team.'
+                        return translate('I could not produce a reliable answer. Please contact the store team.', self.language)
                     self.history = (self.history + [{'role': 'user', 'content': message},
                                      {'role': 'assistant', 'content': answer}])[-16:]
                     return answer
@@ -137,13 +143,13 @@ class Agent:
                     messages.append({'role': 'tool', 'tool_call_id': call['id'],
                                      'content': json.dumps(result, ensure_ascii=False)})
             self.last_error = 'lookup_limit'
-            return 'This request needs help from the store team; I reached my lookup limit.'
+            return translate('This request needs help from the store team; I reached my lookup limit.', self.language)
         except IncompleteResponseError:
             self.last_error = 'incomplete_response'
-            return 'The model response was incomplete. Please try a shorter question or contact the store team.'
+            return translate('The model response was incomplete. Please try a shorter question or contact the store team.', self.language)
         except Exception as error:
             # Retain a non-sensitive category for CLI/capture; never raw provider errors.
             self.last_error = 'rate_limit' if getattr(error, 'status_code', None) == 429 else 'provider_failure'
             if self.last_error == 'rate_limit':
-                return 'The free API request limit has been reached. Please try again later. No fallback provider was called.'
-            return 'The assistant service is unavailable. Please try again or contact the store team.'
+                return translate('The free API request limit has been reached. Please try again later. No fallback provider was called.', self.language)
+            return translate('The assistant service is unavailable. Please try again or contact the store team.', self.language)

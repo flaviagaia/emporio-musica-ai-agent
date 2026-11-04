@@ -136,3 +136,42 @@ def test_provider_failure_is_displayed_once_and_does_not_leak_error(monkeypatch)
     assert len(at.session_state['records']) == 1
     assert len(at.warning) == 1
     assert 'fixture-key' not in '\n'.join(x.value for x in at.markdown)
+
+
+def test_language_switch_keeps_history_and_changes_new_replies_and_export():
+    at = app()
+    assert at.selectbox(key='language').value == 'en'
+    at.chat_input[0].set_value('Yamaha C40 price?').run()
+    original = at.session_state['records'][0].copy()
+    agent = at.session_state['agent']
+    at.selectbox(key='language').set_value('pt').run()
+    assert not at.exception
+    assert at.session_state['records'][0] == original
+    assert at.chat_input[0].placeholder.startswith('Pergunte')
+    at.chat_input[0].set_value('Qual o preço do Yamaha C40 no PIX?').run()
+    assert not at.exception
+    assert at.session_state['agent'] is agent
+    assert len(agent.history) == 4
+    record = at.session_state['records'][-1]
+    assert '569,91' in record['answer'] and 'Fonte:' in record['answer']
+    assert record['language'] == 'pt'
+    exported = transcript(at.session_state['records'], 'mock', 'fixture', 'pt')
+    assert 'Idioma: Português' in exported and original['answer'] in exported
+    at.selectbox(key='language').set_value('en').run()
+    assert len(at.session_state['records']) == 2
+
+
+def test_portuguese_catalog_and_guide_actions_keep_stable_navigation():
+    at = app()
+    at.selectbox(key='language').set_value('pt').run()
+    at.radio(key='workspace').set_value('Catalog').run()
+    at.text_input(key='catalog_query').set_value('Yamaha C40').run()
+    assert not at.exception
+    assert any('599,90' in text.value for text in at.markdown)
+    assert any(button.label == 'Perguntar à Mel sobre este instrumento' for button in at.button)
+    at.radio(key='workspace').set_value('Store guide').run()
+    next(button for button in at.button if button.label == 'Pagamentos').click().run()
+    next(button for button in at.button if button.label == 'Perguntar à Mel sobre esta política').click().run()
+    assert not at.exception
+    assert at.radio(key='workspace').value == 'Chat'
+    assert 'O manual lista PIX' in at.session_state['records'][-1]['answer']
